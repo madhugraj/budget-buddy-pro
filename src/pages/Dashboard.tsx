@@ -233,12 +233,12 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 md:space-y-8 animate-fade-in max-w-[1600px] mx-auto px-4 md:px-6">
       {/* Minimal Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <h1 className="text-2xl font-light tracking-tight">Dashboard</h1>
         <div className="text-sm text-muted-foreground">
-          FY 2025-26
+          Fiscal Year 2025-26
         </div>
       </div>
 
@@ -249,84 +249,94 @@ export default function Dashboard() {
       />
 
       {/* Minimal Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-none shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-muted-foreground">
+            <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
               Total Budget
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{formatCurrency(stats?.totalBudget || 0)}</div>
+            <div className="text-lg md:text-xl font-semibold break-words">{formatCurrency(stats?.totalBudget || 0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Annual allocation</p>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-muted-foreground">
+            <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
               Total Expenses
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{formatCurrency(stats?.totalExpenses || 0)}</div>
+            <div className="text-lg md:text-xl font-semibold break-words">{formatCurrency(stats?.totalExpenses || 0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Approved expenses</p>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-muted-foreground">
+            <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
               Balance
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{formatCurrency(stats?.balance || 0)}</div>
+            <div className="text-lg md:text-xl font-semibold break-words">{formatCurrency(stats?.balance || 0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Available funds</p>
           </CardContent>
         </Card>
 
         <Card className="border-none shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-normal text-muted-foreground">
+            <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
               Pending Approvals
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-semibold">{stats?.pendingApprovals || 0}</div>
+            <div className="text-lg md:text-xl font-semibold break-words">{stats?.pendingApprovals || 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Awaiting review</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Expense Visualizations */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-none shadow-none">
-          <CardContent className="p-0">
-            <MonthlyExpenseChart data={monthlyData} />
-          </CardContent>
-        </Card>
-        <Card className="border-none shadow-none">
-          <CardContent className="p-0">
-            <ItemWiseExpenseChart 
-              data={itemData} 
-              allCategories={allCategories}
-              allCommittees={allCommittees}
-              onCategoryChange={handleCategoryFilter}
-              onCommitteeChange={handleCommitteeFilter}
-            />
-          </CardContent>
-        </Card>
+        <div className="w-full overflow-hidden">
+          <Card className="border-none shadow-none">
+            <CardContent className="p-0">
+              <MonthlyExpenseChart data={monthlyData} />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="w-full overflow-hidden">
+          <Card className="border-none shadow-none">
+            <CardContent className="p-0">
+              <ItemWiseExpenseChart 
+                data={itemData} 
+                allCategories={allCategories}
+                allCommittees={allCommittees}
+                onCategoryChange={handleCategoryFilter}
+                onCommitteeChange={handleCommitteeFilter}
+              />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Item-wise Budget Analysis */}
-      <ItemAnalysisCard 
-        items={allItemData.map(item => ({
-          item_name: item.item_name,
-          full_item_name: item.full_item_name,
-          budget: item.budget,
-          actual: item.amount,
-          utilization: item.utilization,
-          category: item.category,
-          committee: item.committee,
-        }))} 
-      />
+      <div className="w-full">
+        <ItemAnalysisCard 
+          items={allItemData.map(item => ({
+            item_name: item.item_name,
+            full_item_name: item.full_item_name,
+            budget: item.budget,
+            actual: item.amount,
+            utilization: item.utilization,
+            category: item.category,
+            committee: item.committee,
+          }))} 
+        />
+      </div>
     </div>
   );
 }
