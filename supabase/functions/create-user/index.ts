@@ -12,25 +12,30 @@ serve(async (req) => {
   }
 
   try {
-    // Create regular client to verify the calling user
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '').trim();
 
-    // Verify the caller is authenticated
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
+    if (!token) {
       throw new Error('Unauthorized');
     }
 
-    // Create admin client for privileged operations
+    const [, payload] = token.split('.');
+    if (!payload) {
+      throw new Error('Unauthorized');
+    }
+
+    let jwtPayload: { sub?: string };
+    try {
+      jwtPayload = JSON.parse(atob(payload));
+    } catch {
+      throw new Error('Unauthorized');
+    }
+
+    const userId = jwtPayload.sub;
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -42,11 +47,11 @@ serve(async (req) => {
       }
     );
 
-    // Check if user has treasurer role (use regular client for RLS)
-    const { data: roleData, error: roleError } = await supabaseClient
+    // Check if user has treasurer role
+    const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (roleError || !roleData || roleData.role !== 'treasurer') {
