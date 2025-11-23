@@ -1,15 +1,23 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from 'react';
 
 interface ItemData {
   item_name: string;
   amount: number;
   budget: number;
   utilization: number;
+  category?: string;
+  committee?: string;
 }
 
 interface ItemWiseExpenseChartProps {
   data: ItemData[];
+  allCategories: string[];
+  allCommittees: string[];
+  onCategoryChange: (category: string) => void;
+  onCommitteeChange: (committee: string) => void;
 }
 
 const COLORS = [
@@ -20,7 +28,25 @@ const COLORS = [
   'hsl(var(--chart-5))',
 ];
 
-export function ItemWiseExpenseChart({ data }: ItemWiseExpenseChartProps) {
+export function ItemWiseExpenseChart({ 
+  data, 
+  allCategories, 
+  allCommittees,
+  onCategoryChange,
+  onCommitteeChange 
+}: ItemWiseExpenseChartProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCommittee, setSelectedCommittee] = useState<string>('all');
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+    onCategoryChange(value);
+  };
+
+  const handleCommitteeChange = (value: string) => {
+    setSelectedCommittee(value);
+    onCommitteeChange(value);
+  };
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -39,8 +65,36 @@ export function ItemWiseExpenseChart({ data }: ItemWiseExpenseChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top 10 Items by Spending</CardTitle>
-        <CardDescription>Budget utilization by item (showing highest spenders)</CardDescription>
+        <div className="flex flex-col gap-4">
+          <div>
+            <CardTitle>Top 10 Items by Spending</CardTitle>
+            <CardDescription>Budget utilization by item (showing highest spenders)</CardDescription>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {allCategories.map(cat => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedCommittee} onValueChange={handleCommitteeChange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Committee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Committees</SelectItem>
+                {allCommittees.map(comm => (
+                  <SelectItem key={comm} value={comm}>{comm}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={600}>
