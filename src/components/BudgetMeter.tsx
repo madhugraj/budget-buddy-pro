@@ -46,7 +46,7 @@ export function BudgetMeter({ budget, spent }: BudgetMeterProps) {
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="relative w-48 h-48 md:w-64 md:h-64">
               {/* Background Circle */}
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <svg className="w-full h-full -rotate-90 animate-fade-in" viewBox="0 0 100 100">
                 <circle
                   cx="50"
                   cy="50"
@@ -70,7 +70,8 @@ export function BudgetMeter({ budget, spent }: BudgetMeterProps) {
                   strokeWidth="8"
                   strokeDasharray={`${Math.min(percentage, 100) * 2.513} 251.3`}
                   strokeLinecap="round"
-                  className="transition-all duration-500"
+                  className="transition-all duration-1000 ease-out animate-[scale-in_0.8s_ease-out]"
+                  style={{ transformOrigin: 'center' }}
                 />
               </svg>
               
