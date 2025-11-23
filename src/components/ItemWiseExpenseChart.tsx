@@ -164,6 +164,9 @@ export function ItemWiseExpenseChart({
                   dataKey="amount" 
                   radius={[0, 4, 4, 0]}
                   barSize={28}
+                  animationBegin={0}
+                  animationDuration={1000}
+                  animationEasing="ease-out"
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={getBarColor(entry.utilization)} />
