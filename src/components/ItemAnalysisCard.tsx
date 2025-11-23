@@ -68,12 +68,15 @@ export function ItemAnalysisCard({ items }: ItemAnalysisCardProps) {
 
   return (
     <Card className="border-none shadow-none">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-4 space-y-3">
         <CardTitle className="text-base font-normal">Item-wise Budget Analysis</CardTitle>
-        <CardDescription className="text-xs">Select filters and item to view details</CardDescription>
+        <CardDescription className="text-xs">
+          Select a category, committee, and specific item to view detailed budget vs actual comparison. 
+          This shows how much was budgeted, how much was spent, the variance, and utilization percentage.
+        </CardDescription>
         
         {/* Filter Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by Category" />
@@ -232,21 +235,40 @@ export function ItemAnalysisCard({ items }: ItemAnalysisCardProps) {
             </Card>
 
             {/* Summary Stats */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-muted-foreground mb-1">Remaining Budget</p>
-                <p className="font-semibold">
+                <p className="text-muted-foreground mb-1 text-xs">Remaining Budget</p>
+                <p className="font-semibold text-base">
                   {formatCurrency(Math.max(0, currentItem.budget - currentItem.actual))}
                 </p>
-              </div>
-              <div className="p-3 bg-muted/50 rounded-lg">
-                <p className="text-muted-foreground mb-1">Utilization Status</p>
-                <p className="font-semibold">
-                  {currentItem.utilization < 50 ? 'Low' : 
-                   currentItem.utilization < 80 ? 'Moderate' : 
-                   currentItem.utilization < 100 ? 'High' : 'Exceeded'}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Amount left to spend for this item
                 </p>
               </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-muted-foreground mb-1 text-xs">Utilization Status</p>
+                <p className="font-semibold text-base">
+                  {currentItem.utilization < 50 ? 'Low (Under 50%)' : 
+                   currentItem.utilization < 80 ? 'Moderate (50-80%)' : 
+                   currentItem.utilization < 100 ? 'High (80-100%)' : 'Exceeded (Over 100%)'}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {currentItem.utilization < 50 ? 'Spending is well below budget' : 
+                   currentItem.utilization < 80 ? 'Spending is on track' : 
+                   currentItem.utilization < 100 ? 'Approaching budget limit' : 'Budget limit exceeded'}
+                </p>
+              </div>
+            </div>
+
+            {/* Detailed Explanation */}
+            <div className="p-4 bg-muted/20 rounded-lg border border-border/50">
+              <p className="text-xs font-medium mb-2">Understanding This Analysis:</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                <li>• <strong>Budget:</strong> Total allocated amount for this item in FY 2025-26</li>
+                <li>• <strong>Actual Spent:</strong> Sum of all approved expenses for this item</li>
+                <li>• <strong>Variance:</strong> Difference between budget and actual (positive = under budget, negative = over budget)</li>
+                <li>• <strong>Utilization:</strong> Percentage of budget consumed (100% means fully utilized)</li>
+              </ul>
             </div>
           </div>
         ) : (
