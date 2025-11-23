@@ -33,18 +33,18 @@ export function ItemAnalysisCard({ items }: ItemAnalysisCardProps) {
 
   // Get unique categories and committees
   const categories = useMemo(() => {
-    const cats = new Set(items.map(item => item.category));
+    const cats = new Set(items.map(item => item.category).filter(cat => cat && cat.trim() !== ''));
     return Array.from(cats).sort();
   }, [items]);
 
   const committees = useMemo(() => {
-    const comms = new Set(items.map(item => item.committee));
+    const comms = new Set(items.map(item => item.committee).filter(comm => comm && comm.trim() !== ''));
     return Array.from(comms).sort();
   }, [items]);
 
   // Filter items based on category and committee
   const filteredItems = useMemo(() => {
-    let filtered = items;
+    let filtered = items.filter(item => item.item_name && item.item_name.trim() !== '');
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(item => item.category === selectedCategory);
     }
