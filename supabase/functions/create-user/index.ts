@@ -12,6 +12,25 @@ serve(async (req) => {
   }
 
   try {
+    // Create regular client to verify the calling user
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    // Verify the caller is authenticated
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error('Unauthorized');
+    }
+
+    // Create admin client for privileged operations
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -23,17 +42,8 @@ serve(async (req) => {
       }
     );
 
-    // Verify the caller is a treasurer
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Check if user has treasurer role
-    const { data: roleData, error: roleError } = await supabaseAdmin
+    // Check if user has treasurer role (use regular client for RLS)
+    const { data: roleData, error: roleError } = await supabaseClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
