@@ -154,12 +154,7 @@ export default function Expenses() {
             october: cleanCurrency(row['Oct-25'] || row['14']),
           };
         })
-        .filter((row): row is HistoricalExpenseRow => {
-          if (!row) return false;
-          const totalSpend = row.april + row.may + row.june + row.july + 
-                            row.august + row.september + row.october;
-          return totalSpend > 0;
-        });
+        .filter((row): row is HistoricalExpenseRow => row !== null);
 
       setHistoricalPreview(expenseRows);
       setSelectedHistoricalItems(new Set(expenseRows.map((_, index) => index)));
