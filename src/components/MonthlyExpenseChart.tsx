@@ -85,12 +85,18 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
               fill="hsl(var(--primary))" 
               name="Monthly Budget"
               radius={[4, 4, 0, 0]}
+              animationBegin={0}
+              animationDuration={800}
+              animationEasing="ease-out"
             />
             <Bar 
               dataKey="amount" 
               fill="hsl(var(--accent))" 
               name="Actual Spent"
               radius={[4, 4, 0, 0]}
+              animationBegin={200}
+              animationDuration={800}
+              animationEasing="ease-out"
             />
           </BarChart>
         </ResponsiveContainer>
