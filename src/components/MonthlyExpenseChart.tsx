@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, TooltipProps } from 'recharts';
 
 interface MonthlyData {
   month: string;
@@ -19,6 +19,43 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
       maximumFractionDigits: 0,
       notation: 'compact',
     }).format(value);
+  };
+
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (active && payload && payload.length) {
+      const budget = payload[0]?.value || 0;
+      const actual = payload[1]?.value || 0;
+      const variance = budget - actual;
+      const isWithinBudget = variance >= 0;
+
+      return (
+        <div className="bg-card border border-border rounded-lg p-4 shadow-lg">
+          <p className="font-semibold mb-2">{payload[0]?.payload?.month}</p>
+          <div className="space-y-1 text-sm">
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Budget:</span>
+              <span className="font-medium">{formatCurrency(budget)}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span className="text-muted-foreground">Actual:</span>
+              <span className="font-medium">{formatCurrency(actual)}</span>
+            </p>
+            <div className="border-t border-border pt-1 mt-1">
+              <p className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Variance:</span>
+                <span className={`font-semibold ${isWithinBudget ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(Math.abs(variance))}
+                </span>
+              </p>
+              <p className={`text-xs font-medium mt-1 ${isWithinBudget ? 'text-success' : 'text-destructive'}`}>
+                {isWithinBudget ? '✓ Within Budget' : '⚠ Over Budget'}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -41,14 +78,7 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
               className="text-xs"
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
             />
-            <Tooltip 
-              formatter={(value: number) => formatCurrency(value)}
-              contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '8px',
-              }}
-            />
+            <Tooltip content={<CustomTooltip />} />
             <Legend />
             <Bar 
               dataKey="budget" 

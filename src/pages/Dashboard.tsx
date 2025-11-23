@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { MonthlyExpenseChart } from '@/components/MonthlyExpenseChart';
 import { ItemWiseExpenseChart } from '@/components/ItemWiseExpenseChart';
+import { SingleItemDetailView } from '@/components/SingleItemDetailView';
 
 interface DashboardStats {
   totalBudget: number;
@@ -25,12 +26,17 @@ interface ItemData {
   amount: number;
   budget: number;
   utilization: number;
+  category: string;
+  committee: string;
 }
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [itemData, setItemData] = useState<ItemData[]>([]);
+  const [allItemData, setAllItemData] = useState<ItemData[]>([]);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
+  const [allCommittees, setAllCommittees] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -123,7 +129,9 @@ export default function Dashboard() {
           amount,
           budget_master!expenses_budget_master_id_fkey (
             item_name,
-            annual_budget
+            annual_budget,
+            category,
+            committee
           )
         `)
         .eq('status', 'approved')
@@ -133,32 +141,42 @@ export default function Dashboard() {
       if (itemError) throw itemError;
 
       // Aggregate by item
-      const itemMap: Record<string, { amount: number; budget: number }> = {};
+      const itemMap: Record<string, { amount: number; budget: number; category: string; committee: string }> = {};
+      const categoriesSet = new Set<string>();
+      const committeesSet = new Set<string>();
       
       itemExpenses?.forEach((exp: any) => {
         const itemName = exp.budget_master?.item_name;
         const budget = exp.budget_master?.annual_budget || 0;
+        const category = exp.budget_master?.category || '';
+        const committee = exp.budget_master?.committee || '';
         
         if (itemName) {
           if (!itemMap[itemName]) {
-            itemMap[itemName] = { amount: 0, budget: Number(budget) };
+            itemMap[itemName] = { amount: 0, budget: Number(budget), category, committee };
           }
           itemMap[itemName].amount += Number(exp.amount);
+          if (category) categoriesSet.add(category);
+          if (committee) committeesSet.add(committee);
         }
       });
 
-      // Convert to array and sort by amount (top 10)
-      const itemChartData = Object.entries(itemMap)
+      // Convert to array and sort by amount
+      const allItemChartData = Object.entries(itemMap)
         .map(([item_name, data]) => ({
           item_name: item_name.length > 25 ? item_name.substring(0, 25) + '...' : item_name,
           amount: data.amount,
           budget: data.budget,
           utilization: data.budget > 0 ? (data.amount / data.budget) * 100 : 0,
+          category: data.category,
+          committee: data.committee,
         }))
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, 10);
+        .sort((a, b) => b.amount - a.amount);
 
-      setItemData(itemChartData);
+      setAllItemData(allItemChartData);
+      setItemData(allItemChartData.slice(0, 10));
+      setAllCategories(Array.from(categoriesSet).sort());
+      setAllCommittees(Array.from(committeesSet).sort());
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -176,6 +194,22 @@ export default function Dashboard() {
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleCategoryFilter = (category: string) => {
+    let filtered = allItemData;
+    if (category !== 'all') {
+      filtered = filtered.filter(item => item.category === category);
+    }
+    setItemData(filtered.slice(0, 10));
+  };
+
+  const handleCommitteeFilter = (committee: string) => {
+    let filtered = allItemData;
+    if (committee !== 'all') {
+      filtered = filtered.filter(item => item.committee === committee);
+    }
+    setItemData(filtered.slice(0, 10));
   };
 
 
@@ -257,8 +291,26 @@ export default function Dashboard() {
       {/* Expense Visualizations */}
       <div className="grid gap-6 lg:grid-cols-2">
         <MonthlyExpenseChart data={monthlyData} />
-        <ItemWiseExpenseChart data={itemData} />
+        <ItemWiseExpenseChart 
+          data={itemData} 
+          allCategories={allCategories}
+          allCommittees={allCommittees}
+          onCategoryChange={handleCategoryFilter}
+          onCommitteeChange={handleCommitteeFilter}
+        />
       </div>
+
+      {/* Single Item Detail View */}
+      <SingleItemDetailView 
+        items={allItemData.map(item => ({
+          item_name: item.item_name,
+          budget: item.budget,
+          actual: item.amount,
+          utilization: item.utilization,
+          category: item.category,
+          committee: item.committee,
+        }))} 
+      />
     </div>
   );
 }
