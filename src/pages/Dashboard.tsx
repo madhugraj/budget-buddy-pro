@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { DollarSign, TrendingUp, Wallet, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { MonthlyExpenseChart } from '@/components/MonthlyExpenseChart';
+import { ItemWiseExpenseChart } from '@/components/ItemWiseExpenseChart';
 
 interface DashboardStats {
   totalBudget: number;
@@ -13,20 +14,23 @@ interface DashboardStats {
   pendingApprovals: number;
 }
 
-interface Expense {
-  id: string;
-  description: string;
+interface MonthlyData {
+  month: string;
   amount: number;
-  status: string;
-  expense_date: string;
-  budget_items: {
-    category: string;
-  };
+  budget: number;
+}
+
+interface ItemData {
+  item_name: string;
+  amount: number;
+  budget: number;
+  utilization: number;
 }
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [itemData, setItemData] = useState<ItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -74,23 +78,87 @@ export default function Dashboard() {
         pendingApprovals: pendingData?.length || 0,
       });
 
-      // Get recent expenses
-      const { data: recentData, error: recentError } = await supabase
+      // Get monthly spending data
+      const { data: monthlyExpenses, error: monthlyError } = await supabase
+        .from('expenses')
+        .select('amount, expense_date')
+        .eq('status', 'approved')
+        .gte('expense_date', '2025-04-01')
+        .lte('expense_date', '2025-10-31')
+        .order('expense_date');
+
+      if (monthlyError) throw monthlyError;
+
+      // Get monthly budget data
+      const { data: budgetMaster, error: budgetMasterError } = await supabase
+        .from('budget_master')
+        .select('monthly_budget')
+        .eq('fiscal_year', 'FY25-26');
+
+      if (budgetMasterError) throw budgetMasterError;
+
+      const totalMonthlyBudget = budgetMaster?.reduce((sum, item) => sum + Number(item.monthly_budget), 0) || 0;
+
+      // Process monthly data
+      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
+      const monthlyMap: Record<string, number> = {};
+      
+      monthlyExpenses?.forEach(exp => {
+        const month = new Date(exp.expense_date).toLocaleString('en-US', { month: 'short' });
+        monthlyMap[month] = (monthlyMap[month] || 0) + Number(exp.amount);
+      });
+
+      const monthlyChartData = months.map(month => ({
+        month,
+        amount: monthlyMap[month] || 0,
+        budget: totalMonthlyBudget,
+      }));
+
+      setMonthlyData(monthlyChartData);
+
+      // Get item-wise spending data
+      const { data: itemExpenses, error: itemError } = await supabase
         .from('expenses')
         .select(`
-          id,
-          description,
           amount,
-          status,
-          expense_date,
-          budget_items (category)
+          budget_master!expenses_budget_master_id_fkey (
+            item_name,
+            annual_budget
+          )
         `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .eq('status', 'approved')
+        .gte('expense_date', '2025-04-01')
+        .lte('expense_date', '2025-10-31');
 
-      if (recentError) throw recentError;
+      if (itemError) throw itemError;
 
-      setRecentExpenses(recentData || []);
+      // Aggregate by item
+      const itemMap: Record<string, { amount: number; budget: number }> = {};
+      
+      itemExpenses?.forEach((exp: any) => {
+        const itemName = exp.budget_master?.item_name;
+        const budget = exp.budget_master?.annual_budget || 0;
+        
+        if (itemName) {
+          if (!itemMap[itemName]) {
+            itemMap[itemName] = { amount: 0, budget: Number(budget) };
+          }
+          itemMap[itemName].amount += Number(exp.amount);
+        }
+      });
+
+      // Convert to array and sort by amount (top 10)
+      const itemChartData = Object.entries(itemMap)
+        .map(([item_name, data]) => ({
+          item_name: item_name.length > 25 ? item_name.substring(0, 25) + '...' : item_name,
+          amount: data.amount,
+          budget: data.budget,
+          utilization: data.budget > 0 ? (data.amount / data.budget) * 100 : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 10);
+
+      setItemData(itemChartData);
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -110,18 +178,6 @@ export default function Dashboard() {
     }).format(amount);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      pending: 'secondary',
-      approved: 'default',
-      rejected: 'destructive',
-    };
-    return (
-      <Badge variant={variants[status] || 'default'}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
 
   if (loading) {
     return (
@@ -198,39 +254,11 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent Expenses */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentExpenses.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No expenses recorded yet
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {recentExpenses.map((expense) => (
-                <div
-                  key={expense.id}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition-colors"
-                >
-                  <div className="space-y-1">
-                    <p className="font-medium">{expense.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {expense.budget_items?.category} • {new Date(expense.expense_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <p className="font-semibold">{formatCurrency(Number(expense.amount))}</p>
-                    {getStatusBadge(expense.status)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Expense Visualizations */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <MonthlyExpenseChart data={monthlyData} />
+        <ItemWiseExpenseChart data={itemData} />
+      </div>
     </div>
   );
 }
