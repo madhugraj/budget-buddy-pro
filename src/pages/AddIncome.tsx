@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Save, Plus } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 
 interface IncomeCategory {
   id: string;
@@ -20,11 +21,15 @@ interface IncomeCategory {
 }
 
 interface IncomeEntry {
+  id: string;
   category_id: string;
-  actual_amount: number;
-  gst_amount: number;
+  category_name: string;
+  actual_amount: string;
   gst_percentage: number;
+  gst_amount: number;
+  total_amount: number;
   notes: string;
+  isEditing?: boolean;
 }
 
 const MONTHS = [
@@ -47,22 +52,30 @@ export default function AddIncome() {
   const [selectedMonth, setSelectedMonth] = useState<number>(4);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<IncomeCategory[]>([]);
-  const [parentCategories, setParentCategories] = useState<IncomeCategory[]>([]);
-  const [incomeEntries, setIncomeEntries] = useState<Record<string, IncomeEntry>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [actualAmount, setActualAmount] = useState<string>('');
+  const [gstPercentage, setGstPercentage] = useState<number>(18);
+  const [gstAmount, setGstAmount] = useState<number>(0);
+  const [notes, setNotes] = useState<string>('');
+  const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const { toast } = useToast();
   const { userRole } = useAuth();
+
+  const totalAmount = (parseFloat(actualAmount) || 0) + gstAmount;
 
   useEffect(() => {
     fetchCategories();
   }, []);
 
+  // Auto-calculate GST when amount or percentage changes
   useEffect(() => {
-    // Load existing entries when month or year changes
-    if (selectedMonth && fiscalYear) {
-      loadExistingEntries();
+    if (actualAmount && parseFloat(actualAmount) > 0) {
+      const baseAmount = parseFloat(actualAmount);
+      const gst = (baseAmount * gstPercentage) / 100;
+      setGstAmount(Math.round(gst * 100) / 100);
     }
-  }, [selectedMonth, fiscalYear]);
+  }, [actualAmount, gstPercentage]);
 
   const fetchCategories = async () => {
     try {
@@ -73,26 +86,18 @@ export default function AddIncome() {
         .order('display_order');
 
       if (error) throw error;
-      setCategories(data || []);
-
-      const parents = (data || []).filter(cat => cat.parent_category_id === null);
-      setParentCategories(parents);
-
-      // Initialize entries for all categories (both roles see all subcategories for actual income entry)
-      const initialEntries: Record<string, IncomeEntry> = {};
-      data?.forEach(cat => {
-        // Only initialize child categories and parents without children
-        if (cat.parent_category_id !== null) {
-          initialEntries[cat.id] = { category_id: cat.id, actual_amount: 0, gst_amount: 0, gst_percentage: 18, notes: '' };
-        } else {
-          // Check if parent has children
-          const hasChildren = data.some(c => c.parent_category_id === cat.id);
-          if (!hasChildren) {
-            initialEntries[cat.id] = { category_id: cat.id, actual_amount: 0, gst_amount: 0, gst_percentage: 18, notes: '' };
-          }
-        }
+      
+      // Filter to only show leaf categories (categories without children or that are children themselves)
+      const allCategories = data || [];
+      const leafCategories = allCategories.filter(cat => {
+        // If it has a parent, it's a leaf
+        if (cat.parent_category_id !== null) return true;
+        // If it doesn't have a parent, check if it has children
+        const hasChildren = allCategories.some(c => c.parent_category_id === cat.id);
+        return !hasChildren; // Include if it has no children
       });
-      setIncomeEntries(initialEntries);
+      
+      setCategories(leafCategories);
     } catch (error: any) {
       toast({
         title: 'Error loading categories',
@@ -102,73 +107,110 @@ export default function AddIncome() {
     }
   };
 
-  const loadExistingEntries = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('income_actuals')
-        .select('*')
-        .eq('fiscal_year', fiscalYear)
-        .eq('month', selectedMonth);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const loadedEntries: Record<string, IncomeEntry> = { ...incomeEntries };
-        data.forEach(entry => {
-          // Calculate GST percentage from existing data if both amounts are present
-          const gstPercentage = entry.actual_amount > 0 && entry.gst_amount > 0
-            ? Math.round((entry.gst_amount / entry.actual_amount) * 100)
-            : 18;
-          
-          loadedEntries[entry.category_id] = {
-            category_id: entry.category_id,
-            actual_amount: entry.actual_amount,
-            gst_amount: entry.gst_amount || 0,
-            gst_percentage: gstPercentage,
-            notes: entry.notes || '',
-          };
-        });
-        setIncomeEntries(loadedEntries);
-      }
-    } catch (error: any) {
-      console.error('Error loading existing entries:', error);
-    }
-  };
-
-  const handlePreviewIncomes = () => {
-    const incomeRecords = Object.values(incomeEntries)
-      .filter(entry => entry.actual_amount > 0 || entry.gst_amount > 0);
-
-    if (incomeRecords.length === 0) {
+  const handleAddIncome = () => {
+    if (!selectedCategory) {
       toast({
-        title: 'No income to submit',
-        description: 'Please enter income amounts for at least one category',
+        title: 'Missing category',
+        description: 'Please select an income category.',
         variant: 'destructive',
       });
       return;
     }
 
+    if (!actualAmount || parseFloat(actualAmount) <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Base amount must be greater than zero.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const category = categories.find(cat => cat.id === selectedCategory);
+    if (!category) return;
+
+    // Check if CAM without GST - if so, GST should be 0
+    const isCAMWithoutGST = category.category_name.toLowerCase().includes('cam without gst');
+    const finalGstPercentage = isCAMWithoutGST ? 0 : gstPercentage;
+    const finalGstAmount = isCAMWithoutGST ? 0 : gstAmount;
+
+    const newEntry: IncomeEntry = {
+      id: Date.now().toString(),
+      category_id: selectedCategory,
+      category_name: category.subcategory_name || category.category_name,
+      actual_amount: actualAmount,
+      gst_percentage: finalGstPercentage,
+      gst_amount: finalGstAmount,
+      total_amount: (parseFloat(actualAmount) || 0) + finalGstAmount,
+      notes,
+      isEditing: false,
+    };
+
+    setIncomeEntries([...incomeEntries, newEntry]);
+
+    // Reset form
+    setSelectedCategory('');
+    setActualAmount('');
+    setGstPercentage(18);
+    setGstAmount(0);
+    setNotes('');
+
+    toast({
+      title: 'Income added',
+      description: 'Add more income entries or submit all for approval.',
+    });
+  };
+
+  const handleRemoveIncome = (id: string) => {
+    setIncomeEntries(incomeEntries.filter(entry => entry.id !== id));
+  };
+
+  const handleEditIncome = (id: string, field: string, value: any) => {
+    setIncomeEntries(incomeEntries.map(entry => {
+      if (entry.id !== id) return entry;
+      
+      const updated = { ...entry, [field]: value };
+      
+      // Recalculate GST if amount or percentage changes
+      if (field === 'actual_amount' || field === 'gst_percentage') {
+        const baseAmount = parseFloat(updated.actual_amount) || 0;
+        updated.gst_amount = (baseAmount * updated.gst_percentage) / 100;
+        updated.total_amount = baseAmount + updated.gst_amount;
+      }
+      
+      return updated;
+    }));
+  };
+
+  const handleSubmitAll = () => {
+    if (incomeEntries.length === 0) {
+      toast({
+        title: 'No income to submit',
+        description: 'Please add at least one income entry before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setPreviewOpen(true);
   };
 
-  const handleSaveIncomes = async () => {
+  const handleConfirmSubmit = async () => {
     setLoading(true);
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const incomeRecords = Object.values(incomeEntries)
-        .filter(entry => entry.actual_amount > 0 || entry.gst_amount > 0)
-        .map(entry => ({
-          fiscal_year: fiscalYear,
-          month: selectedMonth,
-          category_id: entry.category_id,
-          actual_amount: entry.actual_amount,
-          gst_amount: entry.gst_amount,
-          notes: entry.notes,
-          recorded_by: user.id,
-        }));
+      const incomeRecords = incomeEntries.map(entry => ({
+        fiscal_year: fiscalYear,
+        month: selectedMonth,
+        category_id: entry.category_id,
+        actual_amount: parseFloat(entry.actual_amount),
+        gst_amount: entry.gst_amount,
+        notes: entry.notes,
+        recorded_by: user.id,
+        status: 'pending',
+      }));
 
       const { error } = await supabase
         .from('income_actuals')
@@ -194,7 +236,7 @@ export default function AddIncome() {
             await supabase.functions.invoke('send-income-notification', {
               body: {
                 incomeId: record.id,
-                action: 'updated',
+                action: 'submitted',
               },
             });
           } catch (notifError) {
@@ -205,13 +247,15 @@ export default function AddIncome() {
 
       toast({
         title: 'Submitted for approval',
-        description: `Validation completed and ${incomeRecords.length} income entries submitted.`,
+        description: `${incomeEntries.length} income entry/entries submitted to treasurer for approval.`,
       });
 
+      // Reset
+      setIncomeEntries([]);
       setPreviewOpen(false);
     } catch (error: any) {
       toast({
-        title: 'Error saving income',
+        title: 'Error submitting income',
         description: error.message,
         variant: 'destructive',
       });
@@ -241,7 +285,7 @@ export default function AddIncome() {
         <CardHeader>
           <CardTitle>Income Entry Details</CardTitle>
           <CardDescription>
-            Select the fiscal year and month, then enter actual income amounts received for each subcategory
+            Select fiscal year and month, then add income entries
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -276,414 +320,227 @@ export default function AddIncome() {
               </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-6">
-            <h3 className="font-semibold text-lg border-b pb-2">Income Categories</h3>
-            
-            {/* Both roles see all subcategories for actual income entry */}
-            <div className="space-y-6">
-              {parentCategories.map((parent) => {
-                const children = categories.filter(cat => cat.parent_category_id === parent.id);
-                
-                return (
-                  <div key={parent.id} className="space-y-3">
-                    <h4 className="font-semibold text-sm text-muted-foreground uppercase border-b pb-2">
-                      {parent.category_name}
-                    </h4>
-                    
-                    {children.length > 0 ? (
-                      children.map((child) => {
-                        const isCAMWithoutGST = parent.category_name.toLowerCase().includes('cam without gst');
-                        const total = (incomeEntries[child.id]?.actual_amount || 0) + (incomeEntries[child.id]?.gst_amount || 0);
-                        
-                        return (
-                          <div key={child.id} className="p-4 border rounded-lg space-y-3">
-                            <div className="font-medium text-sm">
-                              {child.subcategory_name || child.category_name}
-                            </div>
-                            
-                            {isCAMWithoutGST ? (
-                              // Single input for CAM without GST
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor={`amount-${child.id}`}>Amount Received</Label>
-                                  <Input
-                                    id={`amount-${child.id}`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={incomeEntries[child.id]?.actual_amount || 0}
-                                    onChange={(e) => setIncomeEntries({
-                                      ...incomeEntries,
-                                      [child.id]: {
-                                        ...incomeEntries[child.id],
-                                        actual_amount: parseFloat(e.target.value) || 0,
-                                        gst_amount: 0,
-                                      },
-                                    })}
-                                    placeholder="Enter amount"
-                                  />
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <Label htmlFor={`notes-${child.id}`}>Notes (Optional)</Label>
-                                  <Input
-                                    id={`notes-${child.id}`}
-                                    type="text"
-                                    value={incomeEntries[child.id]?.notes || ''}
-                                    onChange={(e) => setIncomeEntries({
-                                      ...incomeEntries,
-                                      [child.id]: {
-                                        ...incomeEntries[child.id],
-                                        notes: e.target.value,
-                                      },
-                                    })}
-                                    placeholder="Add notes"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              // Dual input for all other categories (Base + GST)
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`base-${child.id}`}>Base Amount (excl. GST)</Label>
-                                    <Input
-                                      id={`base-${child.id}`}
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={incomeEntries[child.id]?.actual_amount || 0}
-                                      onChange={(e) => {
-                                        const baseAmount = parseFloat(e.target.value) || 0;
-                                        const gstPercentage = incomeEntries[child.id]?.gst_percentage || 18;
-                                        const calculatedGST = Math.round(baseAmount * (gstPercentage / 100) * 100) / 100;
-                                        
-                                        setIncomeEntries({
-                                          ...incomeEntries,
-                                          [child.id]: {
-                                            ...incomeEntries[child.id],
-                                            actual_amount: baseAmount,
-                                            gst_amount: calculatedGST,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="Enter base amount"
-                                    />
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`gst-pct-${child.id}`}>GST %</Label>
-                                    <Select
-                                      value={(incomeEntries[child.id]?.gst_percentage || 18).toString()}
-                                      onValueChange={(value) => {
-                                        const gstPercentage = parseFloat(value);
-                                        const baseAmount = incomeEntries[child.id]?.actual_amount || 0;
-                                        const calculatedGST = Math.round(baseAmount * (gstPercentage / 100) * 100) / 100;
-                                        
-                                        setIncomeEntries({
-                                          ...incomeEntries,
-                                          [child.id]: {
-                                            ...incomeEntries[child.id],
-                                            gst_percentage: gstPercentage,
-                                            gst_amount: calculatedGST,
-                                          },
-                                        });
-                                      }}
-                                    >
-                                      <SelectTrigger id={`gst-pct-${child.id}`}>
-                                        <SelectValue placeholder="GST %" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="18">18%</SelectItem>
-                                        <SelectItem value="5">5%</SelectItem>
-                                        <SelectItem value="12">12%</SelectItem>
-                                        <SelectItem value="28">28%</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`gst-${child.id}`}>GST Amount (auto-calculated)</Label>
-                                    <Input
-                                      id={`gst-${child.id}`}
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={incomeEntries[child.id]?.gst_amount || 0}
-                                      onChange={(e) => setIncomeEntries({
-                                        ...incomeEntries,
-                                        [child.id]: {
-                                          ...incomeEntries[child.id],
-                                          gst_amount: parseFloat(e.target.value) || 0,
-                                        },
-                                      })}
-                                      placeholder="Auto-calculated"
-                                      className="bg-muted"
-                                    />
-                                  </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-muted-foreground">Total Income</Label>
-                                    <div className="px-3 py-2 bg-muted rounded-md font-semibold">
-                                      {formatCurrency(total)}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`notes-${child.id}`}>Notes (Optional)</Label>
-                                    <Input
-                                      id={`notes-${child.id}`}
-                                      type="text"
-                                      value={incomeEntries[child.id]?.notes || ''}
-                                      onChange={(e) => setIncomeEntries({
-                                        ...incomeEntries,
-                                        [child.id]: {
-                                          ...incomeEntries[child.id],
-                                          notes: e.target.value,
-                                        },
-                                      })}
-                                      placeholder="Add notes"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      // If no children, show the parent itself (for categories without subcategories like CAM)
-                      (() => {
-                        const isCAMWithoutGST = parent.category_name.toLowerCase().includes('cam without gst');
-                        const total = (incomeEntries[parent.id]?.actual_amount || 0) + (incomeEntries[parent.id]?.gst_amount || 0);
-                        
-                        return (
-                          <div className="p-4 border rounded-lg space-y-3">
-                            {isCAMWithoutGST ? (
-                              // Single input for CAM without GST
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor={`amount-${parent.id}`}>Amount Received</Label>
-                                  <Input
-                                    id={`amount-${parent.id}`}
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={incomeEntries[parent.id]?.actual_amount || 0}
-                                    onChange={(e) => setIncomeEntries({
-                                      ...incomeEntries,
-                                      [parent.id]: {
-                                        ...incomeEntries[parent.id],
-                                        actual_amount: parseFloat(e.target.value) || 0,
-                                        gst_amount: 0,
-                                      },
-                                    })}
-                                    placeholder="Enter amount"
-                                  />
-                                </div>
-                                
-                                <div className="space-y-2">
-                                  <Label htmlFor={`notes-${parent.id}`}>Notes (Optional)</Label>
-                                  <Input
-                                    id={`notes-${parent.id}`}
-                                    type="text"
-                                    value={incomeEntries[parent.id]?.notes || ''}
-                                    onChange={(e) => setIncomeEntries({
-                                      ...incomeEntries,
-                                      [parent.id]: {
-                                        ...incomeEntries[parent.id],
-                                        notes: e.target.value,
-                                      },
-                                    })}
-                                    placeholder="Add notes"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              // Dual input for all other categories (Base + GST)
-                              <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`base-${parent.id}`}>Base Amount (excl. GST)</Label>
-                                    <Input
-                                      id={`base-${parent.id}`}
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={incomeEntries[parent.id]?.actual_amount || 0}
-                                      onChange={(e) => {
-                                        const baseAmount = parseFloat(e.target.value) || 0;
-                                        const gstPercentage = incomeEntries[parent.id]?.gst_percentage || 18;
-                                        const calculatedGST = Math.round(baseAmount * (gstPercentage / 100) * 100) / 100;
-                                        
-                                        setIncomeEntries({
-                                          ...incomeEntries,
-                                          [parent.id]: {
-                                            ...incomeEntries[parent.id],
-                                            actual_amount: baseAmount,
-                                            gst_amount: calculatedGST,
-                                          },
-                                        });
-                                      }}
-                                      placeholder="Enter base amount"
-                                    />
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`gst-pct-${parent.id}`}>GST %</Label>
-                                    <Select
-                                      value={(incomeEntries[parent.id]?.gst_percentage || 18).toString()}
-                                      onValueChange={(value) => {
-                                        const gstPercentage = parseFloat(value);
-                                        const baseAmount = incomeEntries[parent.id]?.actual_amount || 0;
-                                        const calculatedGST = Math.round(baseAmount * (gstPercentage / 100) * 100) / 100;
-                                        
-                                        setIncomeEntries({
-                                          ...incomeEntries,
-                                          [parent.id]: {
-                                            ...incomeEntries[parent.id],
-                                            gst_percentage: gstPercentage,
-                                            gst_amount: calculatedGST,
-                                          },
-                                        });
-                                      }}
-                                    >
-                                      <SelectTrigger id={`gst-pct-${parent.id}`}>
-                                        <SelectValue placeholder="GST %" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="18">18%</SelectItem>
-                                        <SelectItem value="5">5%</SelectItem>
-                                        <SelectItem value="12">12%</SelectItem>
-                                        <SelectItem value="28">28%</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`gst-${parent.id}`}>GST Amount (auto-calculated)</Label>
-                                    <Input
-                                      id={`gst-${parent.id}`}
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={incomeEntries[parent.id]?.gst_amount || 0}
-                                      onChange={(e) => setIncomeEntries({
-                                        ...incomeEntries,
-                                        [parent.id]: {
-                                          ...incomeEntries[parent.id],
-                                          gst_amount: parseFloat(e.target.value) || 0,
-                                        },
-                                      })}
-                                      placeholder="Auto-calculated"
-                                      className="bg-muted"
-                                    />
-                                  </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-muted-foreground">Total Income</Label>
-                                    <div className="px-3 py-2 bg-muted rounded-md font-semibold">
-                                      {formatCurrency(total)}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`notes-${parent.id}`}>Notes (Optional)</Label>
-                                    <Input
-                                      id={`notes-${parent.id}`}
-                                      type="text"
-                                      value={incomeEntries[parent.id]?.notes || ''}
-                                      onChange={(e) => setIncomeEntries({
-                                        ...incomeEntries,
-                                        [parent.id]: {
-                                          ...incomeEntries[parent.id],
-                                          notes: e.target.value,
-                                        },
-                                      })}
-                                      placeholder="Add notes"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </div>
-                );
-              })}
+      <Card>
+        <CardHeader>
+          <CardTitle>Income Entry</CardTitle>
+          <CardDescription>
+            Fill in the details and add to the list below
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="income-category">Income Category *</Label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger id="income-category">
+                  <SelectValue placeholder="Select income category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.subcategory_name || cat.category_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="actual-amount">Base Amount (₹) *</Label>
+              <Input
+                id="actual-amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={actualAmount}
+                onChange={(e) => setActualAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="gst-percentage">GST %</Label>
+              <Select
+                value={gstPercentage.toString()}
+                onValueChange={(value) => setGstPercentage(parseFloat(value))}
+              >
+                <SelectTrigger id="gst-percentage">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">0%</SelectItem>
+                  <SelectItem value="5">5%</SelectItem>
+                  <SelectItem value="12">12%</SelectItem>
+                  <SelectItem value="18">18%</SelectItem>
+                  <SelectItem value="28">28%</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                GST Amount: {formatCurrency(gstAmount)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Total Amount</Label>
+              <div className="text-2xl font-bold text-primary">
+                {formatCurrency(totalAmount)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Base: {formatCurrency(parseFloat(actualAmount) || 0)} + GST: {formatCurrency(gstAmount)}
+              </p>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add any notes about this income..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t">
-            <Button
-              onClick={handlePreviewIncomes}
-              disabled={loading}
-              size="lg"
-              className="min-w-[200px]"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Preview & Submit Income
-                </>
-              )}
+          <div className="flex justify-end pt-6 border-t mt-6">
+            <Button onClick={handleAddIncome} size="lg">
+              <Plus className="mr-2 h-4 w-4" />
+              Add to List
             </Button>
           </div>
         </CardContent>
       </Card>
 
+      {incomeEntries.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Income Entries to Submit ({incomeEntries.length})</CardTitle>
+            <CardDescription>
+              Review and submit all income entries for approval
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">Category</TableHead>
+                    <TableHead className="w-[120px]">Base</TableHead>
+                    <TableHead className="w-[100px]">GST %</TableHead>
+                    <TableHead className="text-right">Total Amount</TableHead>
+                    <TableHead className="w-[60px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {incomeEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium text-sm">{entry.category_name}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={entry.actual_amount}
+                          onChange={(e) => handleEditIncome(entry.id, 'actual_amount', e.target.value)}
+                          className="h-8 text-xs text-right"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={entry.gst_percentage.toString()}
+                          onValueChange={(value) => handleEditIncome(entry.id, 'gst_percentage', parseFloat(value))}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0%</SelectItem>
+                            <SelectItem value="5">5%</SelectItem>
+                            <SelectItem value="12">12%</SelectItem>
+                            <SelectItem value="18">18%</SelectItem>
+                            <SelectItem value="28">28%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-sm">{formatCurrency(entry.total_amount)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveIncome(entry.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-end pt-6 border-t mt-6">
+              <Button onClick={handleSubmitAll} size="lg" className="min-w-[200px]">
+                Submit All for Approval
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Review Income Entries Before Submitting</DialogTitle>
             <DialogDescription>
-              Check the totals for each category and confirm before sending to the treasurer.
+              Please verify all calculated amounts before sending to the treasurer for approval.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-2 text-sm max-h-[60vh] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted">
-                <tr>
-                  <th className="text-left p-2">Category</th>
-                  <th className="text-right p-2">Base Amount</th>
-                  <th className="text-right p-2">GST Amount</th>
-                  <th className="text-right p-2">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map(cat => {
-                  const entry = incomeEntries[cat.id];
-                  const base = entry?.actual_amount || 0;
-                  const gst = entry?.gst_amount || 0;
-                  const total = base + gst;
-                  if (total <= 0) return null;
-                  return (
-                    <tr key={cat.id} className="border-t">
-                      <td className="p-2">
-                        {cat.subcategory_name || cat.category_name}
-                      </td>
-                      <td className="p-2 text-right">{formatCurrency(base)}</td>
-                      <td className="p-2 text-right">{formatCurrency(gst)}</td>
-                      <td className="p-2 text-right font-medium">{formatCurrency(total)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-4 mt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="text-right">Base</TableHead>
+                  <TableHead className="text-right">GST</TableHead>
+                  <TableHead className="text-right">Total Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {incomeEntries.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-medium">{entry.category_name}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(parseFloat(entry.actual_amount) || 0)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(entry.gst_amount)}</TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(entry.total_amount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+
+            <div className="bg-muted p-4 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Total Base Amount</p>
+                  <p className="text-lg font-semibold">
+                    {formatCurrency(incomeEntries.reduce((sum, e) => sum + (parseFloat(e.actual_amount) || 0), 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total GST</p>
+                  <p className="text-lg font-semibold">
+                    {formatCurrency(incomeEntries.reduce((sum, e) => sum + e.gst_amount, 0))}
+                  </p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-muted-foreground">Total Amount (Base + GST)</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {formatCurrency(incomeEntries.reduce((sum, e) => sum + e.total_amount, 0))}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <DialogFooter className="mt-4 flex justify-end gap-2">
+          <DialogFooter className="mt-6 flex justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -694,7 +551,7 @@ export default function AddIncome() {
             </Button>
             <Button
               type="button"
-              onClick={handleSaveIncomes}
+              onClick={handleConfirmSubmit}
               disabled={loading}
             >
               {loading ? (
