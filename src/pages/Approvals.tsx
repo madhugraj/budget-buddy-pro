@@ -44,7 +44,6 @@ export default function Approvals() {
 
   const loadApprovals = async () => {
     try {
-      // Load pending approvals
       const { data: pending, error: pendingError } = await supabase
         .from('expenses')
         .select(`
@@ -70,7 +69,6 @@ export default function Approvals() {
 
       if (pendingError) throw pendingError;
 
-      // Load correction requests
       const { data: corrections, error: correctionsError } = await supabase
         .from('expenses')
         .select(`
@@ -125,7 +123,6 @@ export default function Approvals() {
 
       if (error) throw error;
 
-      // Send email notification
       supabase.functions.invoke('send-expense-notification', {
         body: { expenseId, action: 'approved' }
       }).then(() => console.log('Approval email sent')).catch(err => console.error('Email failed:', err));
@@ -135,7 +132,6 @@ export default function Approvals() {
         description: 'The expense has been approved successfully',
       });
 
-      // Reload approvals
       await loadApprovals();
     } catch (error: any) {
       toast({
@@ -164,7 +160,6 @@ export default function Approvals() {
 
       if (error) throw error;
 
-      // Send email notification
       supabase.functions.invoke('send-expense-notification', {
         body: { expenseId, action: 'rejected' }
       }).then(() => console.log('Rejection email sent')).catch(err => console.error('Email failed:', err));
@@ -175,7 +170,6 @@ export default function Approvals() {
         variant: 'destructive',
       });
 
-      // Reload approvals
       await loadApprovals();
     } catch (error: any) {
       toast({
@@ -205,7 +199,6 @@ export default function Approvals() {
 
       if (error) throw error;
 
-      // Send notification to accountant
       supabase.functions.invoke('send-expense-notification', {
         body: { expenseId, action: 'correction_approved' }
       }).then(() => console.log('Correction approval email sent')).catch(err => console.error('Email failed:', err));
@@ -215,7 +208,6 @@ export default function Approvals() {
         description: 'The accountant can now edit this expense',
       });
 
-      // Reload approvals
       await loadApprovals();
     } catch (error: any) {
       toast({
@@ -234,7 +226,7 @@ export default function Approvals() {
       const { error } = await supabase
         .from('expenses')
         .update({
-          status: 'approved', // Back to approved
+          status: 'approved',
           correction_reason: null,
           correction_requested_at: null,
         })
@@ -242,7 +234,6 @@ export default function Approvals() {
 
       if (error) throw error;
 
-      // Send notification to accountant
       supabase.functions.invoke('send-expense-notification', {
         body: { expenseId, action: 'correction_rejected' }
       }).then(() => console.log('Correction rejection email sent')).catch(err => console.error('Email failed:', err));
@@ -252,11 +243,10 @@ export default function Approvals() {
         description: 'The expense will remain as-is',
       });
 
-      // Reload approvals
       await loadApprovals();
     } catch (error: any) {
       toast({
-        title: 'Error approving expense',
+        title: 'Error rejecting correction',
         description: error.message,
         variant: 'destructive',
       });
@@ -290,7 +280,6 @@ export default function Approvals() {
         </p>
       </div>
 
-      {/* Correction Requests Section */}
       {correctionRequests.length > 0 && (
         <div className="space-y-4">
           <div>
@@ -385,7 +374,6 @@ export default function Approvals() {
         </div>
       )}
 
-      {/* Regular Pending Approvals Section */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold">Pending Expense Approvals</h2>
