@@ -257,6 +257,118 @@ export type Database = {
           },
         ]
       }
+      income_actuals: {
+        Row: {
+          actual_amount: number
+          category_id: string
+          created_at: string
+          fiscal_year: string
+          id: string
+          month: number
+          notes: string | null
+          recorded_by: string
+          updated_at: string
+        }
+        Insert: {
+          actual_amount?: number
+          category_id: string
+          created_at?: string
+          fiscal_year: string
+          id?: string
+          month: number
+          notes?: string | null
+          recorded_by: string
+          updated_at?: string
+        }
+        Update: {
+          actual_amount?: number
+          category_id?: string
+          created_at?: string
+          fiscal_year?: string
+          id?: string
+          month?: number
+          notes?: string | null
+          recorded_by?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "income_actuals_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "income_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      income_budget: {
+        Row: {
+          budgeted_amount: number
+          category_id: string
+          created_at: string
+          created_by: string
+          fiscal_year: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          budgeted_amount?: number
+          category_id: string
+          created_at?: string
+          created_by: string
+          fiscal_year: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          budgeted_amount?: number
+          category_id?: string
+          created_at?: string
+          created_by?: string
+          fiscal_year?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "income_budget_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "income_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      income_categories: {
+        Row: {
+          category_name: string
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          subcategory_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_name: string
+          created_at?: string
+          display_order: number
+          id?: string
+          is_active?: boolean
+          subcategory_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_name?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          subcategory_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
