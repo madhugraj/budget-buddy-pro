@@ -687,6 +687,7 @@ export default function Expenses() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="0">0%</SelectItem>
                   <SelectItem value="5">5%</SelectItem>
                   <SelectItem value="12">12%</SelectItem>
                   <SelectItem value="18">18%</SelectItem>
@@ -819,6 +820,7 @@ export default function Expenses() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="0">0%</SelectItem>
                             <SelectItem value="5">5%</SelectItem>
                             <SelectItem value="12">12%</SelectItem>
                             <SelectItem value="18">18%</SelectItem>
