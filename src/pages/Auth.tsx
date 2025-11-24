@@ -7,12 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Mail, Lock } from 'lucide-react';
+import { Loader2, ArrowLeft, Mail, Lock, Shield } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [mode, setMode] = useState<'login' | 'forgot'>('login');
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -26,17 +29,78 @@ export default function Auth() {
     });
   }, [navigate]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter both email and password.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      // Send OTP to email
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error) throw error;
+
+      setOtpSent(true);
+      toast({
+        title: 'OTP Sent',
+        description: 'Check your email for the 6-digit verification code.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (otp.length !== 6) {
+      toast({
+        title: 'Invalid OTP',
+        description: 'Please enter a 6-digit code.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // First verify OTP
+      const { error: otpError } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email',
+      });
+
+      if (otpError) throw otpError;
+
+      // Then verify password
+      const { error: passwordError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (passwordError) throw passwordError;
 
       toast({
         title: 'Success',
@@ -47,9 +111,10 @@ export default function Auth() {
     } catch (error: any) {
       toast({
         title: 'Login Failed',
-        description: error.message || 'Invalid email or password.',
+        description: error.message || 'Invalid credentials or OTP.',
         variant: 'destructive',
       });
+      setOtp('');
     } finally {
       setLoading(false);
     }
@@ -67,8 +132,8 @@ export default function Auth() {
       if (error) throw error;
 
       toast({
-        title: 'Reset Link Sent',
-        description: 'Check your email for password reset instructions.',
+        title: 'Magic Link Sent',
+        description: 'Check your email for the password reset link.',
       });
       setMode('login');
     } catch (error: any) {
@@ -98,8 +163,8 @@ export default function Auth() {
           <CardTitle className="text-2xl font-bold text-center">Admin Login</CardTitle>
           <CardDescription className="text-center">
             {mode === 'login' 
-              ? 'Sign in with your email and password'
-              : 'Reset your password'
+              ? 'Enter your credentials and verify with OTP'
+              : 'Reset your password via email'
             }
           </CardDescription>
         </CardHeader>
@@ -111,7 +176,7 @@ export default function Auth() {
             </TabsList>
 
             <TabsContent value="login" className="space-y-4">
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={otpSent ? handleLogin : handleSendOtp} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
                   <Input
@@ -121,6 +186,7 @@ export default function Auth() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={otpSent}
                   />
                 </div>
                 <div className="space-y-2">
@@ -132,13 +198,60 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={otpSent}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <Lock className="mr-2 h-4 w-4" />
-                  Sign In
-                </Button>
+
+                {!otpSent ? (
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send OTP to Email
+                  </Button>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="otp" className="text-center block">Enter 6-Digit OTP</Label>
+                      <div className="flex justify-center">
+                        <InputOTP
+                          maxLength={6}
+                          value={otp}
+                          onChange={(value) => setOtp(value)}
+                        >
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+                      <p className="text-xs text-center text-muted-foreground">
+                        OTP sent to {email}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Button type="submit" className="w-full" disabled={loading || otp.length !== 6}>
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Shield className="mr-2 h-4 w-4" />
+                        Verify & Login
+                      </Button>
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        onClick={() => {
+                          setOtpSent(false);
+                          setOtp('');
+                        }}
+                        className="w-full"
+                      >
+                        Change Email/Password
+                      </Button>
+                    </div>
+                  </>
+                )}
               </form>
             </TabsContent>
 
@@ -156,12 +269,12 @@ export default function Auth() {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  We'll send you a link to reset your password
+                  We'll send you a magic link to reset your password
                 </p>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   <Mail className="mr-2 h-4 w-4" />
-                  Send Reset Link
+                  Send Magic Link
                 </Button>
               </form>
             </TabsContent>
