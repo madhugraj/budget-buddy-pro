@@ -64,7 +64,7 @@ export default function Corrections() {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [editMode, setEditMode] = useState(false);
-
+  
   // Edit form states
   const [editAmount, setEditAmount] = useState<string>('');
   const [editGstPercentage, setEditGstPercentage] = useState<number>(18);
@@ -138,7 +138,7 @@ export default function Corrections() {
 
   const loadHistoricalExpenses = async () => {
     if (userRole !== 'accountant') return;
-
+    
     setHistoricalLoading(true);
     try {
       const { data, error } = await supabase
@@ -258,7 +258,7 @@ export default function Corrections() {
             .select('full_name, email')
             .eq('id', log.performed_by)
             .single();
-
+          
           return {
             ...log,
             profiles: profile || { full_name: 'Unknown', email: '' }
@@ -275,9 +275,9 @@ export default function Corrections() {
   const handleViewDetails = async (expense: Expense) => {
     setSelectedExpense(expense);
     await loadAuditLogs(expense.id);
-
-    // Check if user can edit (accountant or treasurer with correction_approved status)
-    if (expense.status === 'correction_approved' && (userRole === 'accountant' || userRole === 'treasurer')) {
+    
+    // Check if user can edit (accountant with correction_approved status)
+    if (expense.status === 'correction_approved' && userRole === 'accountant') {
       setEditMode(true);
       setEditAmount(expense.amount.toString());
       setEditGstAmount(expense.gst_amount);
@@ -286,7 +286,7 @@ export default function Corrections() {
       setEditDescription(expense.description);
       setEditExpenseDate(expense.expense_date);
       setEditBudgetItem(expense.budget_master?.id || '');
-
+      
       // Calculate GST percentage
       if (expense.amount > 0 && expense.gst_amount > 0) {
         const gstPct = (expense.gst_amount / expense.amount) * 100;
@@ -506,91 +506,91 @@ export default function Corrections() {
 
         <TabsContent value="workflow" className="space-y-6 mt-6">
 
-          <div className="flex items-center gap-4">
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Corrections</SelectItem>
-                <SelectItem value="pending">Pending Approval</SelectItem>
-                <SelectItem value="approved">Awaiting Edit</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="text-sm text-muted-foreground">
-              {expenses.length} correction{expenses.length !== 1 ? 's' : ''} found
-            </div>
+        <div className="flex items-center gap-4">
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Corrections</SelectItem>
+              <SelectItem value="pending">Pending Approval</SelectItem>
+              <SelectItem value="approved">Awaiting Edit</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="text-sm text-muted-foreground">
+            {expenses.length} correction{expenses.length !== 1 ? 's' : ''} found
           </div>
+        </div>
 
-          {expenses.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No corrections found for the selected filter</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {expenses.map((expense) => (
-                <Card key={expense.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2 flex-1 min-w-0">
-                        <CardTitle className="text-lg">{expense.description}</CardTitle>
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium">{expense.budget_master?.item_name || 'N/A'}</span>
-                            <span>•</span>
-                            <span>{expense.budget_master?.category}</span>
+        {expenses.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No corrections found for the selected filter</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {expenses.map((expense) => (
+              <Card key={expense.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <CardTitle className="text-lg">{expense.description}</CardTitle>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{expense.budget_master?.item_name || 'N/A'}</span>
+                          <span>•</span>
+                          <span>{expense.budget_master?.category}</span>
+                        </div>
+                        {expense.correction_reason && (
+                          <div className="flex items-start gap-2 mt-2">
+                            <span className="font-medium">Reason:</span>
+                            <span className="italic">{expense.correction_reason}</span>
                           </div>
-                          {expense.correction_reason && (
-                            <div className="flex items-start gap-2 mt-2">
-                              <span className="font-medium">Reason:</span>
-                              <span className="italic">{expense.correction_reason}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xl font-bold">{formatCurrency(Number(expense.amount + expense.gst_amount - (expense.tds_amount || 0)))}</div>
-                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                          <div>Base: {formatCurrency(expense.amount)}</div>
-                          <div>GST: {formatCurrency(expense.gst_amount)}</div>
-                          {expense.tds_amount > 0 && (
-                            <>
-                              <div>TDS: -{formatCurrency(expense.tds_amount)}</div>
-                              <div className="font-medium">Net: {formatCurrency(expense.amount + expense.gst_amount - expense.tds_amount)}</div>
-                            </>
-                          )}
-                        </div>
-                        {getStatusBadge(expense)}
+                        )}
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(expense)}
-                    >
-                      {expense.status === 'correction_approved' && (userRole === 'accountant' || userRole === 'treasurer') ? (
-                        <>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Expense
-                        </>
-                      ) : (
-                        <>
-                          <History className="h-4 w-4 mr-2" />
-                          View Audit Trail
-                        </>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+                    <div className="text-right shrink-0">
+                      <div className="text-xl font-bold">{formatCurrency(Number(expense.amount + expense.gst_amount - (expense.tds_amount || 0)))}</div>
+                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                        <div>Base: {formatCurrency(expense.amount)}</div>
+                        <div>GST: {formatCurrency(expense.gst_amount)}</div>
+                        {expense.tds_amount > 0 && (
+                          <>
+                            <div>TDS: -{formatCurrency(expense.tds_amount)}</div>
+                            <div className="font-medium">Net: {formatCurrency(expense.amount + expense.gst_amount - expense.tds_amount)}</div>
+                          </>
+                        )}
+                      </div>
+                      {getStatusBadge(expense)}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDetails(expense)}
+                  >
+                    {expense.status === 'correction_approved' && userRole === 'accountant' ? (
+                      <>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Expense
+                      </>
+                    ) : (
+                      <>
+                        <History className="h-4 w-4 mr-2" />
+                        View Audit Trail
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
         </TabsContent>
 
         {userRole === 'accountant' && (
@@ -703,7 +703,7 @@ export default function Corrections() {
                             <TableCell>
                               <Checkbox
                                 checked={selectedHistorical.has(expense.id)}
-                                onCheckedChange={(checked) =>
+                                onCheckedChange={(checked) => 
                                   handleSelectHistorical(expense.id, checked as boolean)
                                 }
                               />
@@ -780,8 +780,8 @@ export default function Corrections() {
             <Button variant="outline" onClick={() => setShowBulkDialog(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleConfirmBulkRequest}
+            <Button 
+              onClick={handleConfirmBulkRequest} 
               disabled={!bulkReason.trim() || bulkSubmitting}
             >
               {bulkSubmitting ? (
@@ -806,7 +806,7 @@ export default function Corrections() {
               {editMode ? 'Make the necessary corrections to this expense' : 'Complete audit trail and correction history'}
             </DialogDescription>
           </DialogHeader>
-
+          
           {selectedExpense && (
             <div className="space-y-6">
               {editMode ? (
@@ -848,8 +848,8 @@ export default function Corrections() {
 
                     <div className="space-y-2">
                       <Label htmlFor="edit-gst-pct">GST %</Label>
-                      <Select
-                        value={editGstPercentage.toString()}
+                      <Select 
+                        value={editGstPercentage.toString()} 
                         onValueChange={(val) => setEditGstPercentage(parseInt(val))}
                       >
                         <SelectTrigger id="edit-gst-pct">
@@ -929,20 +929,20 @@ export default function Corrections() {
                       <p className="mt-1 font-medium">{selectedExpense.budget_master?.item_name || 'N/A'}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">Amount</label>
-                        <p className="mt-1 font-semibold">{formatCurrency(Number(selectedExpense.amount + selectedExpense.gst_amount))}</p>
-                        <p className="text-xs text-muted-foreground space-y-0.5">
-                          <div>Base: {formatCurrency(selectedExpense.amount)}</div>
-                          <div>GST: {formatCurrency(selectedExpense.gst_amount)}</div>
-                          {selectedExpense.tds_amount > 0 && (
-                            <>
-                              <div>TDS: -{formatCurrency(selectedExpense.tds_amount)}</div>
-                              <div className="font-medium mt-1">Net: {formatCurrency(selectedExpense.amount + selectedExpense.gst_amount - selectedExpense.tds_amount)}</div>
-                            </>
-                          )}
-                        </p>
-                      </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Amount</label>
+                      <p className="mt-1 font-semibold">{formatCurrency(Number(selectedExpense.amount + selectedExpense.gst_amount))}</p>
+                      <p className="text-xs text-muted-foreground space-y-0.5">
+                        <div>Base: {formatCurrency(selectedExpense.amount)}</div>
+                        <div>GST: {formatCurrency(selectedExpense.gst_amount)}</div>
+                        {selectedExpense.tds_amount > 0 && (
+                          <>
+                            <div>TDS: -{formatCurrency(selectedExpense.tds_amount)}</div>
+                            <div className="font-medium mt-1">Net: {formatCurrency(selectedExpense.amount + selectedExpense.gst_amount - selectedExpense.tds_amount)}</div>
+                          </>
+                        )}
+                      </p>
+                    </div>
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">Status</label>
                         <div className="mt-1">{getStatusBadge(selectedExpense)}</div>
