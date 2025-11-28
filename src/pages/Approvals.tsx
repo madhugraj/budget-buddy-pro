@@ -266,6 +266,10 @@ export default function Approvals() {
         description: 'The expense has been successfully approved.',
       });
 
+      supabase.functions.invoke('send-expense-notification', {
+        body: { expenseId, action: 'approved' },
+      }).catch(err => console.error('Notification failed:', err));
+
       loadApprovals();
       setSelectedExpense(null);
     } catch (error: any) {
@@ -295,6 +299,10 @@ export default function Approvals() {
         title: 'Expense rejected',
         description: 'The expense has been rejected.',
       });
+
+      supabase.functions.invoke('send-expense-notification', {
+        body: { expenseId, action: 'rejected' },
+      }).catch(err => console.error('Notification failed:', err));
 
       loadApprovals();
       setSelectedExpense(null);
@@ -327,6 +335,10 @@ export default function Approvals() {
         title: 'Correction requested',
         description: 'The expense has been sent back for correction.',
       });
+
+      supabase.functions.invoke('send-expense-notification', {
+        body: { expenseId, action: 'correction_requested' },
+      }).catch(err => console.error('Notification failed:', err));
 
       setIsCorrectionDialogOpen(false);
       setCorrectionReason('');
@@ -365,6 +377,10 @@ export default function Approvals() {
         description: 'The accountant can now edit the expense.',
       });
 
+      supabase.functions.invoke('send-expense-notification', {
+        body: { expenseId, action: 'correction_approved' },
+      }).catch(err => console.error('Notification failed:', err));
+
       loadApprovals();
     } catch (error: any) {
       toast({
@@ -399,6 +415,10 @@ export default function Approvals() {
         description: 'The income record has been successfully approved.',
       });
 
+      supabase.functions.invoke('send-income-notification', {
+        body: { incomeId, action: 'updated' },
+      }).catch(err => console.error('Notification failed:', err));
+
       loadApprovals();
       setSelectedIncome(null);
     } catch (error: any) {
@@ -428,6 +448,10 @@ export default function Approvals() {
         title: 'Income rejected',
         description: 'The income record has been rejected.',
       });
+
+      supabase.functions.invoke('send-income-notification', {
+        body: { incomeId, action: 'updated' },
+      }).catch(err => console.error('Notification failed:', err));
 
       loadApprovals();
       setSelectedIncome(null);

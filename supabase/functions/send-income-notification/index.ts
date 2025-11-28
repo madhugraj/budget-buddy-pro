@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       .from('income_actuals')
       .select(`
         *,
-        category:income_categories(category_name, subcategory_name),
+        category:income_categories!income_actuals_category_id_fkey(category_name, subcategory_name),
         recorder:profiles!income_actuals_recorded_by_fkey(full_name, email)
       `)
       .eq('id', incomeId)
@@ -63,13 +63,13 @@ Deno.serve(async (req) => {
     }
 
     // Format category name
-    const categoryName = income.category.subcategory_name 
+    const categoryName = income.category.subcategory_name
       ? `${income.category.category_name} - ${income.category.subcategory_name}`
       : income.category.category_name;
 
     // Format month name
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
     const monthName = monthNames[income.month - 1];
 
     // Format amounts
