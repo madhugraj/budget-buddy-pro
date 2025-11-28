@@ -114,13 +114,13 @@ export default function Approvals() {
         .from('expenses')
         .select(`
           *,
-          budget_master (
+          budget_master!expenses_budget_master_id_fkey (
             item_name,
             category,
             committee,
             annual_budget
           ),
-          profiles (full_name, email)
+          profiles!expenses_claimed_by_fkey (full_name, email)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -132,7 +132,7 @@ export default function Approvals() {
         .from('income_actuals')
         .select(`
           *,
-          income_categories (
+          income_categories!income_actuals_category_id_fkey (
             category_name,
             subcategory_name
           )
@@ -163,13 +163,13 @@ export default function Approvals() {
         .from('expenses')
         .select(`
           *,
-          budget_master (
+          budget_master!expenses_budget_master_id_fkey (
             item_name,
             category,
             committee,
             annual_budget
           ),
-          profiles (full_name, email)
+          profiles!expenses_claimed_by_fkey (full_name, email)
         `)
         .eq('status', 'correction_pending')
         .order('created_at', { ascending: false });
@@ -199,8 +199,8 @@ export default function Approvals() {
         .from('expenses')
         .select(`
           *,
-          budget_master (item_name, category),
-          profiles (full_name)
+          budget_master!expenses_budget_master_id_fkey (item_name, category, committee, annual_budget),
+          profiles!expenses_claimed_by_fkey (full_name, email)
         `)
         .in('status', ['approved', 'paid'])
         .order('expense_date', { ascending: false })
@@ -213,7 +213,7 @@ export default function Approvals() {
         .from('income_actuals')
         .select(`
           *,
-          income_categories (category_name)
+          income_categories!income_actuals_category_id_fkey (category_name, subcategory_name)
         `)
         .eq('status', 'approved')
         .order('created_at', { ascending: false })
@@ -226,7 +226,7 @@ export default function Approvals() {
         (income || []).map(async (inc) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, email')
             .eq('id', inc.recorded_by)
             .single();
           return { ...inc, profiles: profile || { full_name: 'Unknown', email: '' } };
