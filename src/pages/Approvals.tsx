@@ -1007,14 +1007,15 @@ export default function Approvals() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Expense Details</DialogTitle>
-            <DialogDescription>Complete information about this expense claim</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+      {selectedExpense && (
+        <Dialog open={!!selectedExpense} onOpenChange={() => setSelectedExpense(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Expense Details</DialogTitle>
+              <DialogDescription>Complete information about this expense claim</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Description</p>
                   <p className="font-medium">{selectedExpense.description}</p>
@@ -1075,8 +1076,9 @@ export default function Approvals() {
                 </Button>
               )}
             </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {selectedIncome && (
         <Dialog open={!!selectedIncome} onOpenChange={(open) => !open && setSelectedIncome(null)}>
