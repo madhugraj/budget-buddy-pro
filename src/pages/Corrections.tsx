@@ -242,7 +242,8 @@ export default function Corrections() {
 
     setHistoricalLoading(true);
     try {
-      const { data, error } = await supabase
+      // First fetch income data without the profile join
+      const { data: incomeData, error } = await supabase
         .from('income_actuals')
         .select(`
           id,
@@ -253,12 +254,12 @@ export default function Corrections() {
           notes,
           status,
           created_at,
+          recorded_by,
           income_categories!income_actuals_category_id_fkey (
             id,
             category_name,
             subcategory_name
-          ),
-          profiles!income_actuals_recorded_by_fkey (full_name, email)
+          )
         `)
         .eq('status', 'approved')
         .gte('created_at', `${dateFrom}T00:00:00`)
@@ -266,7 +267,33 @@ export default function Corrections() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setHistoricalIncome(data || []);
+
+      // Then fetch profiles manually
+      const recordedByIds = Array.from(new Set((incomeData || []).map(i => i.recorded_by).filter(Boolean)));
+
+      let profilesMap: Record<string, { full_name: string, email: string }> = {};
+
+      if (recordedByIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', recordedByIds);
+
+        if (!profilesError && profilesData) {
+          profilesMap = profilesData.reduce((acc, profile) => {
+            acc[profile.id] = { full_name: profile.full_name || '', email: profile.email || '' };
+            return acc;
+          }, {} as Record<string, { full_name: string, email: string }>);
+        }
+      }
+
+      // Combine the data
+      const incomeWithProfiles = (incomeData || []).map(income => ({
+        ...income,
+        profiles: profilesMap[income.recorded_by] || { full_name: 'Unknown', email: '' }
+      }));
+
+      setHistoricalIncome(incomeWithProfiles as unknown as Income[]);
     } catch (error: any) {
       toast({
         title: 'Error loading historical income',
