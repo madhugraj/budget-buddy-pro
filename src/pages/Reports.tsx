@@ -1,5 +1,7 @@
 import { ExportExpenses } from '@/components/ExportExpenses';
 import { ExportIncome } from '@/components/ExportIncome';
+import { ExportGST } from '@/components/ExportGST';
+import { ExportBudget } from '@/components/ExportBudget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -14,10 +16,11 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue="expense" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="expense">Expense</TabsTrigger>
           <TabsTrigger value="income">Income</TabsTrigger>
           <TabsTrigger value="gst">GST</TabsTrigger>
+          <TabsTrigger value="budget">Budget</TabsTrigger>
           <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>
         </TabsList>
 
@@ -30,17 +33,10 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="gst" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>GST Reports</CardTitle>
-              <CardDescription>View and export GST-related data and filings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                GST reporting functionality will be available soon.
-              </p>
-            </CardContent>
-          </Card>
+          <ExportGST />
+        </TabsContent>
+        <TabsContent value="budget" className="mt-6">
+          <ExportBudget />
         </TabsContent>
 
         <TabsContent value="petty-cash" className="mt-6">
