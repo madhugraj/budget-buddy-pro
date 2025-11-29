@@ -26,7 +26,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['treasurer', 'accountant', 'general', 'lead'] },
-  { name: 'Upload Budget - Expense', href: '/budget-upload', icon: Upload, roles: ['treasurer', 'lead'] },
+  { name: 'Upload Budget - Expense', href: '/budget-upload', icon: Upload, roles: ['treasurer'] },
   { name: 'Budget Upload - Income', href: '/income-budget-upload', icon: Upload, roles: ['treasurer'] },
   { name: 'Add Income', href: '/add-income', icon: Plus, roles: ['accountant', 'treasurer'] },
   { name: 'Add Expense', href: '/expenses', icon: Receipt, roles: ['accountant', 'treasurer'] },
