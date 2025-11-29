@@ -12,7 +12,7 @@ export default function UserManagement() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState<'treasurer' | 'accountant'>('accountant');
+  const [role, setRole] = useState<'treasurer' | 'accountant' | 'lead'>('accountant');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -68,7 +68,7 @@ export default function UserManagement() {
             <CardTitle>Create New User</CardTitle>
           </div>
           <CardDescription>
-            Add a new accountant or treasurer to the system
+            Add a new accountant, treasurer, or lead to the system
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -112,13 +112,14 @@ export default function UserManagement() {
 
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={role} onValueChange={(value: 'treasurer' | 'accountant') => setRole(value)}>
+              <Select value={role} onValueChange={(value: 'treasurer' | 'accountant' | 'lead') => setRole(value)}>
                 <SelectTrigger id="role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="accountant">Accountant</SelectItem>
                   <SelectItem value="treasurer">Treasurer (Admin)</SelectItem>
+                  <SelectItem value="lead">Lead</SelectItem>
                 </SelectContent>
               </Select>
             </div>
