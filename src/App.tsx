@@ -17,6 +17,7 @@ import Corrections from "./pages/Corrections";
 import Historical from "./pages/Historical";
 import UserManagement from "./pages/UserManagement";
 import Reports from "./pages/Reports";
+import PettyCash from "./pages/PettyCash";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -132,6 +133,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <Corrections />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/petty-cash"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <PettyCash />
                   </AppLayout>
                 </ProtectedRoute>
               }

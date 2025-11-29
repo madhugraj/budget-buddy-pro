@@ -71,9 +71,26 @@ interface Income {
   };
 }
 
+interface PettyCash {
+  id: string;
+  item_name: string;
+  description: string;
+  amount: number;
+  bill_url: string | null;
+  date: string;
+  status: string;
+  created_at: string;
+  submitted_by: string;
+  profiles: {
+    full_name: string;
+    email: string;
+  };
+}
+
 export default function Approvals() {
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([]);
   const [pendingIncome, setPendingIncome] = useState<Income[]>([]);
+  const [pendingPettyCash, setPendingPettyCash] = useState<PettyCash[]>([]);
   const [correctionRequests, setCorrectionRequests] = useState<Expense[]>([]);
 
   // Historical Data State
@@ -84,6 +101,7 @@ export default function Approvals() {
   const [processing, setProcessing] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
+  const [selectedPettyCash, setSelectedPettyCash] = useState<PettyCash | null>(null);
   const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<Set<string>>(new Set());
   const [correctionReason, setCorrectionReason] = useState('');
   const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false);
@@ -142,6 +160,15 @@ export default function Approvals() {
 
       if (incomeError) throw incomeError;
 
+      // Fetch pending petty cash
+      const { data: pendingPettyCashData, error: pettyCashError } = await supabase
+        .from('petty_cash')
+        .select('*, profiles!petty_cash_submitted_by_fkey (full_name, email)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (pettyCashError) throw pettyCashError;
+
       // Fetch profile details separately for income
       const incomeWithProfiles = await Promise.all(
         (pendingIncomeData || []).map(async (income) => {
@@ -178,6 +205,7 @@ export default function Approvals() {
 
       setPendingExpenses(pending || []);
       setPendingIncome(incomeWithProfiles as Income[] || []);
+      setPendingPettyCash(pendingPettyCashData as unknown as PettyCash[] || []);
       setCorrectionRequests(corrections || []);
 
     } catch (error: any) {
@@ -466,6 +494,49 @@ export default function Approvals() {
     }
   };
 
+  const handleApprovePettyCash = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('petty_cash')
+        .update({ status: 'approved', approved_by: user.id })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({ title: 'Approved', description: 'Petty cash request approved' });
+      loadApprovals();
+      setSelectedPettyCash(null);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRejectPettyCash = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('petty_cash')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({ title: 'Rejected', description: 'Petty cash request rejected' });
+      loadApprovals();
+      setSelectedPettyCash(null);
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -501,6 +572,9 @@ export default function Approvals() {
           </TabsTrigger>
           <TabsTrigger value="corrections">
             Corrections ({correctionRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="petty-cash">
+            Petty Cash ({pendingPettyCash.length})
           </TabsTrigger>
           <TabsTrigger value="historical">
             Historical Data
@@ -651,6 +725,48 @@ export default function Approvals() {
                           <Button size="sm" onClick={() => handleApproveCorrection(request.id)}>
                             Approve Correction
                           </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="petty-cash" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Petty Cash</CardTitle>
+              <CardDescription>Review petty cash requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pendingPettyCash.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">No pending petty cash requests</div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingPettyCash.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="space-y-1">
+                        <div className="font-medium">{item.item_name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {item.profiles?.full_name} • {new Date(item.date).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{item.description}</div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="font-bold">{formatCurrency(item.amount)}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          {item.bill_url && (
+                            <Button variant="ghost" size="sm" onClick={() => window.open(item.bill_url!, '_blank')}>
+                              View Bill
+                            </Button>
+                          )}
+                          <Button size="sm" onClick={() => handleApprovePettyCash(item.id)}>Approve</Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleRejectPettyCash(item.id)}>Reject</Button>
                         </div>
                       </div>
                     </div>

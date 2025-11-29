@@ -8,7 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, FileDown } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, FileDown, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
@@ -165,6 +165,82 @@ export function ExportExpenses() {
         description: error.message,
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportSummaryPDF = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchExpenseData();
+
+      const totalBase = data.reduce((sum: number, d: any) => sum + Number(d.amount), 0);
+      const totalGST = data.reduce((sum: number, d: any) => sum + Number(d.gst_amount || 0), 0);
+      const totalTDS = data.reduce((sum: number, d: any) => sum + Number(d.tds_amount || 0), 0);
+      const totalNet = totalBase + totalGST - totalTDS;
+
+      const byCategory: Record<string, number> = {};
+      data.forEach((d: any) => {
+        const cat = d.budget_master?.category || 'Uncategorized';
+        byCategory[cat] = (byCategory[cat] || 0) + Number(d.amount);
+      });
+
+      const doc = new jsPDF('portrait');
+
+      doc.setFontSize(20);
+      doc.setTextColor(16, 185, 129);
+      doc.text('Expense Summary Report', 14, 20);
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 28);
+
+      if (dateFrom || dateTo) {
+        doc.text(
+          `Period: ${dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Start'} - ${dateTo ? format(dateTo, 'dd/MM/yyyy') : 'End'}`,
+          14,
+          35
+        );
+      }
+
+      doc.setFontSize(14);
+      doc.text('Overview', 14, 48);
+
+      autoTable(doc, {
+        startY: 52,
+        head: [['Description', 'Amount']],
+        body: [
+          ['Total Base Amount', `₹${totalBase.toLocaleString('en-IN')}`],
+          ['Total GST', `₹${totalGST.toLocaleString('en-IN')}`],
+          ['Total TDS', `₹${totalTDS.toLocaleString('en-IN')}`],
+          ['Total Net Payment', `₹${totalNet.toLocaleString('en-IN')}`],
+        ],
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [16, 185, 129] },
+        columnStyles: { 0: { fontStyle: 'bold' } },
+      });
+
+      let yPos = (doc as any).lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.text('Expenses by Category', 14, yPos);
+
+      const categoryData = Object.entries(byCategory).map(([cat, amount]) => [
+        cat,
+        `₹${amount.toLocaleString('en-IN')}`
+      ]);
+
+      autoTable(doc, {
+        startY: yPos + 4,
+        head: [['Category', 'Base Amount']],
+        body: categoryData,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [79, 70, 229] },
+      });
+
+      doc.save(`expense_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast({ title: 'Summary PDF exported', description: 'Dashboard-style summary exported' });
+    } catch (error: any) {
+      toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -331,6 +407,19 @@ export function ExportExpenses() {
           </div>
 
           <div className="flex gap-3 flex-wrap">
+            <Button
+              onClick={handleExportSummaryPDF}
+              disabled={loading}
+              variant="default"
+              className="flex-1 min-w-[200px]"
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <BarChart3 className="mr-2 h-4 w-4" />
+              )}
+              Export Summary PDF
+            </Button>
             <Button
               onClick={() => handleExport('excel')}
               disabled={loading}

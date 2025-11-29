@@ -2,11 +2,11 @@ import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  Upload, 
-  Receipt, 
-  History, 
+import {
+  LayoutDashboard,
+  Upload,
+  Receipt,
+  History,
   LogOut,
   Menu,
   CheckCircle,
@@ -34,6 +34,7 @@ const navigation = [
   { name: 'Corrections', href: '/corrections', icon: Edit3, roles: ['accountant', 'treasurer'] },
   { name: 'User Management', href: '/user-management', icon: UserCog, roles: ['treasurer'] },
   { name: 'Reports', href: '/reports', icon: FileBarChart, roles: ['treasurer', 'accountant', 'lead'] },
+  { name: 'Petty Cash', href: '/petty-cash', icon: Receipt, roles: ['treasurer', 'lead', 'accountant'] },
   { name: 'Historical Data', href: '/historical', icon: History, roles: ['treasurer', 'accountant'] },
 ];
 
@@ -41,9 +42,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { signOut, userRole, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   // Filter navigation based on user role
-  const filteredNavigation = navigation.filter(item => 
+  const filteredNavigation = navigation.filter(item =>
     userRole && item.roles.includes(userRole)
   );
 
@@ -77,44 +78,44 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="flex h-16 items-center px-4 justify-between">
           {user && (
             <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
-              <div className="flex flex-col h-full">
-                <div className="p-6 border-b">
-                  <h2 className="text-xl font-bold text-primary">Expense Manager</h2>
-                  {userRole && (
-                    <p className="text-xs text-muted-foreground mt-1 capitalize">
-                      {userRole === 'treasurer' ? 'Admin' : userRole}
-                    </p>
-                  )}
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="mr-2">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0">
+                <div className="flex flex-col h-full">
+                  <div className="p-6 border-b">
+                    <h2 className="text-xl font-bold text-primary">Expense Manager</h2>
+                    {userRole && (
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">
+                        {userRole === 'treasurer' ? 'Admin' : userRole}
+                      </p>
+                    )}
+                  </div>
+                  <nav className="flex-1 p-4 space-y-1">
+                    <NavLinks />
+                  </nav>
+                  <div className="p-4 border-t">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={signOut}
+                    >
+                      <LogOut className="mr-3 h-5 w-5" />
+                      Sign Out
+                    </Button>
+                  </div>
                 </div>
-                <nav className="flex-1 p-4 space-y-1">
-                  <NavLinks />
-                </nav>
-                <div className="p-4 border-t">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={signOut}
-                  >
-                    <LogOut className="mr-3 h-5 w-5" />
-                    Sign Out
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetContent>
+            </Sheet>
           )}
           <h1 className="text-lg font-semibold">Expense Manager</h1>
           <div className="flex items-center gap-2">
             {user && <NotificationBell />}
             {!user && (
-              <Button 
-                variant="default" 
+              <Button
+                variant="default"
                 size="sm"
                 onClick={() => navigate('/auth')}
               >
@@ -131,7 +132,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         {/* Login Button for Desktop (when not logged in) */}
         {!user && (
           <div className="hidden lg:block fixed top-8 right-8 z-50">
-            <Button 
+            <Button
               variant="default"
               size="default"
               onClick={() => navigate('/auth')}
@@ -142,35 +143,35 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </Button>
           </div>
         )}
-        
+
         {/* Sidebar */}
         {user && (
           <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-card">
-          <div className="flex flex-col h-full">
-            <div className="p-6 border-b">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-primary">Expense Manager</h2>
-                <NotificationBell />
+            <div className="flex flex-col h-full">
+              <div className="p-6 border-b">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-primary">Expense Manager</h2>
+                  <NotificationBell />
+                </div>
+                {userRole && (
+                  <p className="text-sm text-muted-foreground mt-1 capitalize">
+                    {userRole === 'treasurer' ? 'Admin' : userRole}
+                  </p>
+                )}
               </div>
-              {userRole && (
-                <p className="text-sm text-muted-foreground mt-1 capitalize">
-                  {userRole === 'treasurer' ? 'Admin' : userRole}
-                </p>
-              )}
-            </div>
-            <nav className="flex-1 p-4 space-y-1">
-              <NavLinks />
-            </nav>
-            <div className="p-4 border-t">
-              <Button
-                variant="ghost"
-                className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={signOut}
-              >
-                <LogOut className="mr-3 h-5 w-5" />
-                Sign Out
-              </Button>
-            </div>
+              <nav className="flex-1 p-4 space-y-1">
+                <NavLinks />
+              </nav>
+              <div className="p-4 border-t">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={signOut}
+                >
+                  <LogOut className="mr-3 h-5 w-5" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </aside>
         )}

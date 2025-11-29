@@ -8,7 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, FileDown } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, FileDown, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
@@ -197,6 +197,80 @@ export function ExportIncome() {
         }
     };
 
+    const handleExportSummaryPDF = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchIncomeData();
+
+            const totalBase = data.reduce((sum: number, d: any) => sum + Number(d.actual_amount), 0);
+            const totalGST = data.reduce((sum: number, d: any) => sum + Number(d.gst_amount || 0), 0);
+            const totalAmount = totalBase + totalGST;
+
+            const byCategory: Record<string, number> = {};
+            data.forEach((d: any) => {
+                const cat = d.income_categories?.category_name || 'Uncategorized';
+                byCategory[cat] = (byCategory[cat] || 0) + Number(d.actual_amount);
+            });
+
+            const doc = new jsPDF('portrait');
+
+            doc.setFontSize(20);
+            doc.setTextColor(16, 185, 129);
+            doc.text('Income Summary Report', 14, 20);
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 28);
+
+            if (dateFrom || dateTo) {
+                doc.text(
+                    `Period: ${dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Start'} - ${dateTo ? format(dateTo, 'dd/MM/yyyy') : 'End'}`,
+                    14,
+                    35
+                );
+            }
+
+            doc.setFontSize(14);
+            doc.text('Overview', 14, 48);
+
+            autoTable(doc, {
+                startY: 52,
+                head: [['Description', 'Amount']],
+                body: [
+                    ['Total Base Amount', `₹${totalBase.toLocaleString('en-IN')}`],
+                    ['Total GST', `₹${totalGST.toLocaleString('en-IN')}`],
+                    ['Total Amount', `₹${totalAmount.toLocaleString('en-IN')}`],
+                ],
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [16, 185, 129] },
+                columnStyles: { 0: { fontStyle: 'bold' } },
+            });
+
+            let yPos = (doc as any).lastAutoTable.finalY + 15;
+            doc.setFontSize(14);
+            doc.text('Income by Category', 14, yPos);
+
+            const categoryData = Object.entries(byCategory).map(([cat, amount]) => [
+                cat,
+                `₹${amount.toLocaleString('en-IN')}`
+            ]);
+
+            autoTable(doc, {
+                startY: yPos + 4,
+                head: [['Category', 'Base Amount']],
+                body: categoryData,
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [16, 185, 129] },
+            });
+
+            doc.save(`income_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+            toast({ title: 'Summary PDF exported', description: 'Dashboard-style summary exported' });
+        } catch (error: any) {
+            toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleExport = async (exportFormat: 'excel' | 'csv') => {
         setLoading(true);
         try {
@@ -360,6 +434,19 @@ export function ExportIncome() {
                     </div>
 
                     <div className="flex gap-3 flex-wrap">
+                        <Button
+                            onClick={handleExportSummaryPDF}
+                            disabled={loading}
+                            variant="default"
+                            className="flex-1 min-w-[200px]"
+                        >
+                            {loading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <BarChart3 className="mr-2 h-4 w-4" />
+                            )}
+                            Export Summary PDF
+                        </Button>
                         <Button
                             onClick={() => handleExport('excel')}
                             disabled={loading}

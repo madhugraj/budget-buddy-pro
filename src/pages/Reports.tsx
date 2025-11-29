@@ -5,6 +5,8 @@ import { ExportBudget } from '@/components/ExportBudget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+import { ExportPettyCash } from '@/components/ExportPettyCash';
+
 export default function Reports() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -40,17 +42,7 @@ export default function Reports() {
         </TabsContent>
 
         <TabsContent value="petty-cash" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Petty Cash Reports</CardTitle>
-              <CardDescription>View and export petty cash transactions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Petty Cash reporting functionality will be available soon.
-              </p>
-            </CardContent>
-          </Card>
+          <ExportPettyCash />
         </TabsContent>
       </Tabs>
     </div>

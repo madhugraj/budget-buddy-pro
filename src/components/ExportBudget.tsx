@@ -7,6 +7,10 @@ import { Loader2, FileSpreadsheet, FileText, FileDown } from 'lucide-react';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { format } from 'date-fns';
+import { BarChart3 } from 'lucide-react';
 
 export function ExportBudget() {
     const [loading, setLoading] = useState(false);
@@ -36,6 +40,68 @@ export function ExportBudget() {
             toast({ title: 'Budget loaded', description: `Showing ${data.length} budget items` });
         } catch (error: any) {
             toast({ title: 'Failed to load budget', description: error.message, variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleExportSummaryPDF = async () => {
+        setLoading(true);
+        try {
+            const data = await fetchBudgetData();
+
+            const totalBudget = data.reduce((sum: number, d: any) => sum + Number(d.Budget), 0);
+
+            const byCategory: Record<string, number> = {};
+            data.forEach((d: any) => {
+                const cat = d.Category || 'Uncategorized';
+                byCategory[cat] = (byCategory[cat] || 0) + Number(d.Budget);
+            });
+
+            const doc = new jsPDF('portrait');
+
+            doc.setFontSize(20);
+            doc.setTextColor(16, 185, 129);
+            doc.text('Budget Summary Report', 14, 20);
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 28);
+
+            doc.setFontSize(14);
+            doc.text('Overview', 14, 40);
+
+            autoTable(doc, {
+                startY: 44,
+                head: [['Description', 'Amount']],
+                body: [
+                    ['Total Annual Budget', `₹${totalBudget.toLocaleString('en-IN')}`],
+                ],
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [16, 185, 129] },
+                columnStyles: { 0: { fontStyle: 'bold' } },
+            });
+
+            let yPos = (doc as any).lastAutoTable.finalY + 15;
+            doc.setFontSize(14);
+            doc.text('Budget by Category', 14, yPos);
+
+            const categoryData = Object.entries(byCategory).map(([cat, amount]) => [
+                cat,
+                `₹${amount.toLocaleString('en-IN')}`
+            ]);
+
+            autoTable(doc, {
+                startY: yPos + 4,
+                head: [['Category', 'Budget Amount']],
+                body: categoryData,
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [79, 70, 229] },
+            });
+
+            doc.save(`budget_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+            toast({ title: 'Summary PDF exported', description: 'Dashboard-style summary exported' });
+        } catch (error: any) {
+            toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
         } finally {
             setLoading(false);
         }
@@ -71,6 +137,10 @@ export function ExportBudget() {
                 <Button onClick={handleView} disabled={loading} variant="secondary" className="flex-1 min-w-[200px]">
                     {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                     View Budget
+                </Button>
+                <Button onClick={handleExportSummaryPDF} disabled={loading} variant="default" className="flex-1 min-w-[200px]">
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
+                    Export Summary PDF
                 </Button>
                 <div className="flex gap-3 flex-wrap">
                     <Button onClick={() => handleExport('excel')} disabled={loading} className="flex-1 min-w-[200px]">

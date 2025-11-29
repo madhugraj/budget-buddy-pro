@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  userRole: 'treasurer' | 'accountant' | 'general' | null;
+  userRole: 'treasurer' | 'accountant' | 'lead' | 'general' | null;
   signOut: () => Promise<void>;
 }
 
@@ -16,7 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   userRole: null,
-  signOut: async () => {},
+  signOut: async () => { },
 });
 
 export const useAuth = () => {
@@ -30,7 +30,7 @@ export const useAuth = () => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<'treasurer' | 'accountant' | 'general' | null>(null);
+  const [userRole, setUserRole] = useState<'treasurer' | 'accountant' | 'lead' | 'general' | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      
+
       if (data) {
-        setUserRole(data.role as 'treasurer' | 'accountant');
+        setUserRole(data.role as 'treasurer' | 'accountant' | 'lead');
       } else {
         setUserRole('general'); // No role = general user
       }
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         // Fetch role when user logs in
         if (session?.user) {
           setTimeout(() => {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setUserRole(null);
         }
-        
+
         setLoading(false);
       }
     );
@@ -80,11 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchUserRole(session.user.id);
       }
-      
+
       setLoading(false);
     });
 
@@ -97,15 +97,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setUserRole(null);
-      
+
       // Attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         console.error('Sign out error:', error);
         // Still navigate even if there's an error since we cleared local state
       }
-      
+
       // Always navigate to auth page after clearing state
       navigate('/auth');
     } catch (error) {
