@@ -253,7 +253,7 @@ export default function Dashboard() {
       // Get income categories
       const { data: categories, error: categoriesError } = await supabase
         .from('income_categories')
-        .select('id, category_name, parent_category_id')
+        .select('id, category_name, parent_category_id, subcategory_name')
         .eq('is_active', true)
         .order('display_order');
 
@@ -261,6 +261,9 @@ export default function Dashboard() {
 
       // Get parent categories only
       const parentCategories = categories?.filter(c => !c.parent_category_id) || [];
+
+      // Create a map of all categories for easy lookup
+      const categoryMap = new Map(categories?.map(c => [c.id, c]) || []);
 
       // Get income budget data
       const { data: budgetData, error: budgetError } = await supabase
@@ -270,28 +273,30 @@ export default function Dashboard() {
 
       if (budgetError) throw budgetError;
 
-      // Get actual income data
+      // Get actual income data (approved only)
       const { data: actualData, error: actualError } = await supabase
         .from('income_actuals')
         .select('category_id, actual_amount, gst_amount, month')
-        .eq('fiscal_year', 'FY25-26');
+        .eq('fiscal_year', 'FY25-26')
+        .eq('status', 'approved');
 
       if (actualError) throw actualError;
 
       // Process monthly income data (merge base + GST)
-      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
+      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyActuals: Record<number, number> = {};
 
       actualData?.forEach(actual => {
-        const monthIndex = actual.month - 4; // Apr = 4, convert to 0-indexed
-        if (monthIndex >= 0 && monthIndex < 7) {
+        const monthIndex = actual.month - 4; // Apr = 4, convert to 0-indexed (Apr = 0)
+        const adjustedIndex = monthIndex < 0 ? monthIndex + 12 : monthIndex; // Handle Jan-Mar (next year)
+        if (adjustedIndex >= 0 && adjustedIndex < 12) {
           const totalIncome = Number(actual.actual_amount) + Number(actual.gst_amount || 0);
-          monthlyActuals[monthIndex] = (monthlyActuals[monthIndex] || 0) + totalIncome;
+          monthlyActuals[adjustedIndex] = (monthlyActuals[adjustedIndex] || 0) + totalIncome;
         }
       });
 
-      const totalMonthlyBudget = budgetData?.reduce((sum, item) => sum + Number(item.budgeted_amount), 0) || 0;
-      const monthlyBudget = totalMonthlyBudget / 12;
+      const totalAnnualBudget = budgetData?.reduce((sum, item) => sum + Number(item.budgeted_amount), 0) || 0;
+      const monthlyBudget = totalAnnualBudget / 12;
 
       const monthlyIncomeChartData = months.map((month, index) => ({
         month,
@@ -301,34 +306,63 @@ export default function Dashboard() {
 
       setMonthlyIncomeData(monthlyIncomeChartData);
 
-      // Process category-wise income data (merge base + GST)
-      const categoryMap: Record<string, { budget: number; actual: number }> = {};
+      // Process category-wise income data (aggregate by parent category)
+      const parentCategoryData: Record<string, { budget: number; actual: number; children: string[] }> = {};
 
-      parentCategories.forEach(category => {
-        const budget = budgetData?.find(b => b.category_id === category.id);
-        const actuals = actualData?.filter(a => a.category_id === category.id);
-        const totalActual = actuals?.reduce((sum, a) => {
-          const totalIncome = Number(a.actual_amount) + Number(a.gst_amount || 0);
-          return sum + totalIncome;
-        }, 0) || 0;
-
-        categoryMap[category.category_name] = {
-          budget: Number(budget?.budgeted_amount || 0),
-          actual: totalActual,
+      // Initialize parent categories
+      parentCategories.forEach(parent => {
+        parentCategoryData[parent.id] = {
+          budget: 0,
+          actual: 0,
+          children: []
         };
       });
 
-      const categoryIncomeChartData = Object.entries(categoryMap)
-        .map(([category, data]) => ({
-          category: category.length > 25 ? category.substring(0, 25) + '...' : category,
-          actual: data.actual,
-          budget: data.budget,
-          utilization: data.budget > 0 ? (data.actual / data.budget) * 100 : 0,
-        }))
+      // Aggregate budgets - handle both parent and child categories
+      budgetData?.forEach(budgetItem => {
+        const category = categoryMap.get(budgetItem.category_id);
+        if (!category) return;
+
+        const parentId = category.parent_category_id || category.id;
+        if (parentCategoryData[parentId]) {
+          parentCategoryData[parentId].budget += Number(budgetItem.budgeted_amount);
+          if (category.parent_category_id) {
+            parentCategoryData[parentId].children.push(category.id);
+          }
+        }
+      });
+
+      // Aggregate actuals - handle both parent and child categories
+      actualData?.forEach(actualItem => {
+        const category = categoryMap.get(actualItem.category_id);
+        if (!category) return;
+
+        const parentId = category.parent_category_id || category.id;
+        if (parentCategoryData[parentId]) {
+          const totalIncome = Number(actualItem.actual_amount) + Number(actualItem.gst_amount || 0);
+          parentCategoryData[parentId].actual += totalIncome;
+        }
+      });
+
+      // Convert to chart data format
+      const categoryIncomeChartData = parentCategories
+        .map(parent => {
+          const data = parentCategoryData[parent.id];
+          return {
+            category: parent.category_name.length > 25
+              ? parent.category_name.substring(0, 25) + '...'
+              : parent.category_name,
+            actual: data.actual,
+            budget: data.budget,
+            utilization: data.budget > 0 ? (data.actual / data.budget) * 100 : 0,
+          };
+        })
+        .filter(item => item.budget > 0 || item.actual > 0) // Only show categories with data
         .sort((a, b) => b.actual - a.actual);
 
       setCategoryIncomeData(categoryIncomeChartData);
     } catch (error: any) {
+      console.error('Error loading income data:', error);
       toast({
         title: 'Error loading income data',
         description: error.message,
@@ -462,8 +496,8 @@ export default function Dashboard() {
 
         <Card
           className={`border-none shadow-none bg-gradient-to-br from-card to-warning/5 hover:shadow-md transition-all ${userRole === 'treasurer' && stats?.pendingApprovals && stats.pendingApprovals > 0
-              ? 'cursor-pointer ring-2 ring-warning/30 animate-pulse hover:ring-warning/50'
-              : ''
+            ? 'cursor-pointer ring-2 ring-warning/30 animate-pulse hover:ring-warning/50'
+            : ''
             }`}
           onClick={() => {
             if (userRole === 'treasurer' && stats?.pendingApprovals && stats.pendingApprovals > 0) {
