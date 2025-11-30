@@ -103,6 +103,7 @@ export default function Approvals() {
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
   const [selectedPettyCash, setSelectedPettyCash] = useState<PettyCash | null>(null);
   const [selectedCorrectionIds, setSelectedCorrectionIds] = useState<Set<string>>(new Set());
+  const [selectedIncomeIds, setSelectedIncomeIds] = useState<Set<string>>(new Set());
   const [correctionReason, setCorrectionReason] = useState('');
   const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('expenses');
@@ -460,6 +461,7 @@ export default function Approvals() {
     }
   };
 
+
   const handleRejectIncome = async (incomeId: string) => {
     setProcessing(true);
     try {
@@ -493,6 +495,53 @@ export default function Approvals() {
       setProcessing(false);
     }
   };
+
+  const handleBulkApproveIncome = async () => {
+    if (selectedIncomeIds.size === 0) {
+      toast({
+        title: 'No items selected',
+        description: 'Please select at least one income record to approve',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const incomeIds = Array.from(selectedIncomeIds);
+
+      const { error } = await supabase
+        .from('income_actuals')
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        })
+        .in('id', incomeIds);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success!',
+        description: `Approved ${incomeIds.length} income record(s)`,
+      });
+
+      setSelectedIncomeIds(new Set());
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error approving income',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
 
   const handleApprovePettyCash = async (id: string) => {
     setProcessing(true);
@@ -635,8 +684,48 @@ export default function Approvals() {
         <TabsContent value="income" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pending Income</CardTitle>
-              <CardDescription>Review and approve income records</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Pending Income</CardTitle>
+                  <CardDescription>Review and approve income records</CardDescription>
+                </div>
+                {pendingIncome.length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedIncomeIds.size === pendingIncome.length) {
+                          setSelectedIncomeIds(new Set());
+                        } else {
+                          setSelectedIncomeIds(new Set(pendingIncome.map(i => i.id)));
+                        }
+                      }}
+                    >
+                      {selectedIncomeIds.size === pendingIncome.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                    {selectedIncomeIds.size > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={handleBulkApproveIncome}
+                        disabled={processing}
+                      >
+                        {processing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Approving...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Approve Selected ({selectedIncomeIds.size})
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {pendingIncome.length === 0 ? (
@@ -648,9 +737,23 @@ export default function Approvals() {
                   {pendingIncome.map((income) => (
                     <div
                       key={income.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                     >
-                      <div className="space-y-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedIncomeIds.has(income.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedIncomeIds);
+                          if (e.target.checked) {
+                            newSelected.add(income.id);
+                          } else {
+                            newSelected.delete(income.id);
+                          }
+                          setSelectedIncomeIds(newSelected);
+                        }}
+                        className="h-4 w-4 cursor-pointer"
+                      />
+                      <div className="flex-1 space-y-1">
                         <div className="font-medium">
                           {income.income_categories?.category_name}
                           {income.income_categories?.subcategory_name && ` - ${income.income_categories.subcategory_name}`}
