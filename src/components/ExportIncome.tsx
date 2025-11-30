@@ -44,19 +44,23 @@ export function ExportIncome() {
           subcategory_name
         )
       `)
-            .order('created_at', { ascending: false });
+            .order('month', { ascending: true });
 
         // Apply filters
         if (status !== 'all') {
             query = query.eq('status', status);
         }
 
+        // Filter by month range if dates are provided
+        // Convert date range to month numbers (1-12)
         if (dateFrom) {
-            query = query.gte('created_at', format(dateFrom, 'yyyy-MM-dd') + 'T00:00:00');
+            const fromMonth = dateFrom.getMonth() + 1; // JS months are 0-indexed
+            query = query.gte('month', fromMonth);
         }
 
         if (dateTo) {
-            query = query.lte('created_at', format(dateTo, 'yyyy-MM-dd') + 'T23:59:59');
+            const toMonth = dateTo.getMonth() + 1; // JS months are 0-indexed
+            query = query.lte('month', toMonth);
         }
 
         const { data: incomeData, error } = await query;
@@ -98,6 +102,11 @@ export function ExportIncome() {
         }));
     };
 
+    const getMonthName = (monthNumber: number): string => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return months[monthNumber - 1] || 'Unknown';
+    };
+
     const handleView = async () => {
         setLoading(true);
         try {
@@ -105,7 +114,7 @@ export function ExportIncome() {
 
             // Transform data for view
             const transformedData = data.map((income: any) => ({
-                date: format(new Date(income.created_at), 'dd/MM/yyyy'),
+                month_name: getMonthName(income.month),
                 category: income.income_categories?.category_name || 'N/A',
                 subcategory: income.income_categories?.subcategory_name || '-',
                 fiscal_year: income.fiscal_year,
@@ -162,7 +171,7 @@ export function ExportIncome() {
             }
 
             const tableData = data.map((income: any) => [
-                format(new Date(income.created_at), 'dd/MM/yyyy'),
+                getMonthName(income.month),
                 income.income_categories?.category_name || 'N/A',
                 income.income_categories?.subcategory_name || '-',
                 income.fiscal_year,
@@ -174,7 +183,7 @@ export function ExportIncome() {
 
             autoTable(doc, {
                 startY: 38,
-                head: [['Date', 'Category', 'Subcategory', 'FY', 'Base', 'GST', 'Total', 'Status']],
+                head: [['Month', 'Category', 'Subcategory', 'FY', 'Base', 'GST', 'Total', 'Status']],
                 body: tableData,
                 styles: { fontSize: 8 },
                 headStyles: { fillColor: [16, 185, 129] }, // Green for income
@@ -278,11 +287,10 @@ export function ExportIncome() {
 
             // Transform data for export with proper headers
             const exportData = data.map((income: any) => ({
-                'Date': format(new Date(income.created_at), 'dd/MM/yyyy'),
+                'Month': getMonthName(income.month),
                 'Category': income.income_categories?.category_name || 'N/A',
                 'Subcategory': income.income_categories?.subcategory_name || '-',
                 'Fiscal Year': income.fiscal_year,
-                'Month': income.month,
                 'Base Amount (₹)': Number(income.actual_amount),
                 'GST Amount (₹)': Number(income.gst_amount || 0),
                 'Total Amount (₹)': Number(income.actual_amount) + Number(income.gst_amount || 0),
@@ -490,7 +498,7 @@ export function ExportIncome() {
                                 <Table>
                                     <TableHeader className="sticky top-0 bg-muted z-10">
                                         <TableRow>
-                                            <TableHead>Date</TableHead>
+                                            <TableHead>Month</TableHead>
                                             <TableHead>Category</TableHead>
                                             <TableHead>Subcategory</TableHead>
                                             <TableHead className="text-right">Base</TableHead>
@@ -503,7 +511,7 @@ export function ExportIncome() {
                                     <TableBody>
                                         {viewData.map((row, index) => (
                                             <TableRow key={index}>
-                                                <TableCell className="whitespace-nowrap">{row.date}</TableCell>
+                                                <TableCell className="whitespace-nowrap">{row.month_name}</TableCell>
                                                 <TableCell className="font-medium">{row.category}</TableCell>
                                                 <TableCell>{row.subcategory}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(row.base_amount)}</TableCell>

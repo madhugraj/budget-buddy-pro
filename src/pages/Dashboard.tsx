@@ -276,35 +276,25 @@ export default function Dashboard() {
       // Get actual income data (approved only)
       const { data: actualData, error: actualError } = await supabase
         .from('income_actuals')
-        .select('category_id, actual_amount, gst_amount, created_at')
+        .select('category_id, actual_amount, gst_amount, month')
         .eq('fiscal_year', 'FY25-26')
         .eq('status', 'approved');
 
       if (actualError) throw actualError;
 
-      // Process monthly income data based on registration date (created_at)
+      // Process monthly income data by the month field (which month the income is FOR)
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyActuals: Record<number, number> = {};
 
       actualData?.forEach(actual => {
-        // Parse the created_at date to get the month
-        const createdDate = new Date(actual.created_at);
-        const createdMonth = createdDate.getMonth() + 1; // JS months are 0-indexed, so add 1
+        // Use the month field which represents which month this income is for
+        // month 4 = April (index 0), month 5 = May (index 1), etc.
+        const monthIndex = actual.month - 4; // Apr = 4, convert to 0-indexed (Apr = 0)
+        const adjustedIndex = monthIndex < 0 ? monthIndex + 12 : monthIndex; // Handle Jan-Mar (next year)
 
-        // Convert to fiscal year month index (Apr = 0, May = 1, ..., Mar = 11)
-        // FY25-26: Apr 2025 (month 4) to Mar 2026 (month 3)
-        let monthIndex;
-        if (createdMonth >= 4) {
-          // Apr-Dec of 2025
-          monthIndex = createdMonth - 4;
-        } else {
-          // Jan-Mar of 2026
-          monthIndex = createdMonth + 8; // Jan=9, Feb=10, Mar=11
-        }
-
-        if (monthIndex >= 0 && monthIndex < 12) {
+        if (adjustedIndex >= 0 && adjustedIndex < 12) {
           const totalIncome = Number(actual.actual_amount) + Number(actual.gst_amount || 0);
-          monthlyActuals[monthIndex] = (monthlyActuals[monthIndex] || 0) + totalIncome;
+          monthlyActuals[adjustedIndex] = (monthlyActuals[adjustedIndex] || 0) + totalIncome;
         }
       });
 
