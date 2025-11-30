@@ -151,7 +151,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <div className="p-6 border-b">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-primary">Expense Manager</h2>
-                  <NotificationBell />
+                  <div className="flex items-center gap-1">
+                    <NotificationBell />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={signOut}
+                      title="Sign Out"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 {userRole && (
                   <p className="text-sm text-muted-foreground mt-1 capitalize">
@@ -162,16 +173,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <nav className="flex-1 p-4 space-y-1">
                 <NavLinks />
               </nav>
-              <div className="p-4 border-t">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={signOut}
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  Sign Out
-                </Button>
-              </div>
             </div>
           </aside>
         )}
