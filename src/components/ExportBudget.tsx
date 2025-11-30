@@ -291,6 +291,12 @@ export function ExportBudget() {
                                                 <td className="p-2 text-right">₹{row.Budget.toLocaleString('en-IN')}</td>
                                             </tr>
                                         ))}
+                                        <tr className="bg-red-50 font-bold border-t-2 border-red-200">
+                                            <td colSpan={2} className="p-2 text-right">Total Expense Budget</td>
+                                            <td className="p-2 text-right">
+                                                ₹{viewExpenseData.reduce((sum, item) => sum + item.Budget, 0).toLocaleString('en-IN')}
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </CardContent>
@@ -347,6 +353,12 @@ export function ExportBudget() {
                                                 <td className="p-2 text-right">₹{row.Budget.toLocaleString('en-IN')}</td>
                                             </tr>
                                         ))}
+                                        <tr className="bg-green-50 font-bold border-t-2 border-green-200">
+                                            <td colSpan={2} className="p-2 text-right">Total Income Budget</td>
+                                            <td className="p-2 text-right">
+                                                ₹{viewIncomeData.reduce((sum, item) => sum + item.Budget, 0).toLocaleString('en-IN')}
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </CardContent>

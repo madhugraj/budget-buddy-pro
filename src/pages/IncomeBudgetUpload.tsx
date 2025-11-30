@@ -33,12 +33,37 @@ export default function IncomeBudgetUpload() {
   const [categories, setCategories] = useState<IncomeCategory[]>([]);
   const [parentCategories, setParentCategories] = useState<IncomeCategory[]>([]);
   const [manualBudgets, setManualBudgets] = useState<Record<string, number>>({});
+  const [existingBudgets, setExistingBudgets] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { userRole } = useAuth();
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+    fetchExistingBudgets();
+  }, [fiscalYear]);
+
+  const fetchExistingBudgets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('income_budget')
+        .select('category_id, budgeted_amount')
+        .eq('fiscal_year', fiscalYear);
+
+      if (error) throw error;
+
+      const existingIds = new Set((data || []).map(d => d.category_id));
+      setExistingBudgets(existingIds);
+
+      // Pre-fill existing amounts
+      const existingMap: Record<string, number> = {};
+      data?.forEach(d => {
+        existingMap[d.category_id] = Number(d.budgeted_amount);
+      });
+      setManualBudgets(prev => ({ ...prev, ...existingMap }));
+    } catch (error) {
+      console.error('Error fetching existing budgets:', error);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -72,7 +97,7 @@ export default function IncomeBudgetUpload() {
         });
       }
 
-      setManualBudgets(initialBudgets);
+      setManualBudgets(prev => ({ ...initialBudgets, ...prev }));
     } catch (error: any) {
       toast({
         title: 'Error loading categories',
@@ -208,6 +233,7 @@ export default function IncomeBudgetUpload() {
       setPreview([]);
       const fileInput = document.getElementById('file-upload') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
+      fetchExistingBudgets(); // Refresh existing budgets after upload
     } catch (error: any) {
       toast({
         title: 'Error uploading budget',
@@ -237,7 +263,7 @@ export default function IncomeBudgetUpload() {
       const existingCategoryIds = new Set((existingItems || []).map(item => item.category_id));
 
       const budgetItems = Object.entries(manualBudgets)
-        .filter(([_, amount]) => amount > 0)
+        .filter(([categoryId, amount]) => amount > 0 && !existingCategoryIds.has(categoryId)) // Only save new budgets
         .map(([categoryId, amount]) => ({
           fiscal_year: fiscalYear,
           category_id: categoryId,
@@ -245,11 +271,11 @@ export default function IncomeBudgetUpload() {
           created_by: user.id,
         }));
 
-      // Check for duplicates
+      // Check for duplicates (should be handled by the filter above, but good for explicit error)
       const duplicates = budgetItems.filter(item => existingCategoryIds.has(item.category_id));
 
       if (duplicates.length > 0) {
-        // Find category name for error message
+        // This block should ideally not be reached if the filter is correct, but as a safeguard
         const duplicateCat = categories.find(c => c.id === duplicates[0].category_id);
         const catName = duplicateCat ? getCategoryDisplay(duplicateCat) : 'Unknown Category';
         throw new Error(`Budget already exists for ${duplicates.length} categories (e.g. ${catName}). Please use Corrections to edit.`);
@@ -257,8 +283,8 @@ export default function IncomeBudgetUpload() {
 
       if (budgetItems.length === 0) {
         toast({
-          title: 'No budgets to save',
-          description: 'Please enter budget amounts for at least one category',
+          title: 'No new budgets to save',
+          description: 'Please enter budget amounts for at least one new category, or all selected categories already have a budget.',
           variant: 'destructive',
         });
         return;
@@ -274,6 +300,7 @@ export default function IncomeBudgetUpload() {
         title: 'Success!',
         description: `Saved ${budgetItems.length} income budget items for fiscal year ${fiscalYear}`,
       });
+      fetchExistingBudgets(); // Refresh existing budgets after save
     } catch (error: any) {
       toast({
         title: 'Error saving budgets',
@@ -430,11 +457,12 @@ export default function IncomeBudgetUpload() {
                             min="0"
                             step="0.01"
                             value={manualBudgets[parent.id] || 0}
+                            disabled={existingBudgets.has(parent.id)}
                             onChange={(e) => setManualBudgets({
                               ...manualBudgets,
                               [parent.id]: parseFloat(e.target.value) || 0,
                             })}
-                            className="max-w-xs"
+                            className={`max-w-xs ${existingBudgets.has(parent.id) ? 'bg-muted text-muted-foreground' : ''}`}
                             placeholder="Enter amount"
                           />
                         </div>
@@ -462,11 +490,12 @@ export default function IncomeBudgetUpload() {
                                   min="0"
                                   step="0.01"
                                   value={manualBudgets[child.id] || 0}
+                                  disabled={existingBudgets.has(child.id)}
                                   onChange={(e) => setManualBudgets({
                                     ...manualBudgets,
                                     [child.id]: parseFloat(e.target.value) || 0,
                                   })}
-                                  className="max-w-xs"
+                                  className={`max-w-xs ${existingBudgets.has(child.id) ? 'bg-muted text-muted-foreground' : ''}`}
                                   placeholder="Enter amount"
                                 />
                               </div>
@@ -483,11 +512,12 @@ export default function IncomeBudgetUpload() {
                                 min="0"
                                 step="0.01"
                                 value={manualBudgets[parent.id] || 0}
+                                disabled={existingBudgets.has(parent.id)}
                                 onChange={(e) => setManualBudgets({
                                   ...manualBudgets,
                                   [parent.id]: parseFloat(e.target.value) || 0,
                                 })}
-                                className="max-w-xs"
+                                className={`max-w-xs ${existingBudgets.has(parent.id) ? 'bg-muted text-muted-foreground' : ''}`}
                                 placeholder="Enter amount"
                               />
                             </div>
