@@ -425,6 +425,7 @@ export type Database = {
           amount: number
           approved_at: string | null
           approved_by: string | null
+          bill_url: string | null
           created_at: string
           date: string
           description: string | null
@@ -438,6 +439,7 @@ export type Database = {
           amount: number
           approved_at?: string | null
           approved_by?: string | null
+          bill_url?: string | null
           created_at?: string
           date?: string
           description?: string | null
@@ -451,6 +453,7 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          bill_url?: string | null
           created_at?: string
           date?: string
           description?: string | null
