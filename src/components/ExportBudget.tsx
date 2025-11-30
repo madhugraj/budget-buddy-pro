@@ -19,16 +19,42 @@ export function ExportBudget() {
     const { toast } = useToast();
 
     const fetchBudgetData = async () => {
-        const { data, error } = await supabase
+        // Fetch Expense Budget
+        const { data: expenseData, error: expenseError } = await supabase
             .from('budget_master')
             .select('category, item_name, annual_budget')
             .order('category');
-        if (error) throw error;
-        return (data || []).map((b: any) => ({
+
+        if (expenseError) throw expenseError;
+
+        const expenses = (expenseData || []).map((b: any) => ({
+            Type: 'Expense',
             Category: b.category || 'N/A',
             Item: b.item_name || 'N/A',
             Budget: Number(b.annual_budget) || 0,
         }));
+
+        // Fetch Income Budget
+        const { data: incomeData, error: incomeError } = await supabase
+            .from('income_budget')
+            .select(`
+                budgeted_amount,
+                income_categories (
+                    category_name,
+                    subcategory_name
+                )
+            `);
+
+        if (incomeError) throw incomeError;
+
+        const income = (incomeData || []).map((b: any) => ({
+            Type: 'Income',
+            Category: b.income_categories?.category_name || 'N/A',
+            Item: b.income_categories?.subcategory_name || '-',
+            Budget: Number(b.budgeted_amount) || 0,
+        }));
+
+        return [...income, ...expenses];
     };
 
     const handleView = async () => {
@@ -50,13 +76,11 @@ export function ExportBudget() {
         try {
             const data = await fetchBudgetData();
 
-            const totalBudget = data.reduce((sum: number, d: any) => sum + Number(d.Budget), 0);
+            const incomeData = data.filter((d: any) => d.Type === 'Income');
+            const expenseData = data.filter((d: any) => d.Type === 'Expense');
 
-            const byCategory: Record<string, number> = {};
-            data.forEach((d: any) => {
-                const cat = d.Category || 'Uncategorized';
-                byCategory[cat] = (byCategory[cat] || 0) + Number(d.Budget);
-            });
+            const totalIncome = incomeData.reduce((sum: number, d: any) => sum + Number(d.Budget), 0);
+            const totalExpense = expenseData.reduce((sum: number, d: any) => sum + Number(d.Budget), 0);
 
             const doc = new jsPDF('portrait');
 
@@ -74,33 +98,75 @@ export function ExportBudget() {
                 startY: 44,
                 head: [['Description', 'Amount']],
                 body: [
-                    ['Total Annual Budget', `₹${totalBudget.toLocaleString('en-IN')}`],
+                    ['Total Income Budget', `₹${totalIncome.toLocaleString('en-IN')}`],
+                    ['Total Expense Budget', `₹${totalExpense.toLocaleString('en-IN')}`],
+                    ['Net Budget', `₹${(totalIncome - totalExpense).toLocaleString('en-IN')}`],
                 ],
                 styles: { fontSize: 10 },
                 headStyles: { fillColor: [16, 185, 129] },
-                columnStyles: { 0: { fontStyle: 'bold' } },
+                columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'right' } },
             });
 
             let yPos = (doc as any).lastAutoTable.finalY + 15;
-            doc.setFontSize(14);
-            doc.text('Budget by Category', 14, yPos);
 
-            const categoryData = Object.entries(byCategory).map(([cat, amount]) => [
-                cat,
-                `₹${amount.toLocaleString('en-IN')}`
-            ]);
+            // Income Section
+            if (incomeData.length > 0) {
+                doc.setFontSize(14);
+                doc.text('Income Budget', 14, yPos);
 
-            autoTable(doc, {
-                startY: yPos + 4,
-                head: [['Category', 'Budget Amount']],
-                body: categoryData,
-                styles: { fontSize: 10 },
-                headStyles: { fillColor: [79, 70, 229] },
-            });
+                const incomeByCategory: Record<string, number> = {};
+                incomeData.forEach((d: any) => {
+                    const cat = d.Category || 'Uncategorized';
+                    incomeByCategory[cat] = (incomeByCategory[cat] || 0) + Number(d.Budget);
+                });
+
+                const incomeRows = Object.entries(incomeByCategory).map(([cat, amount]) => [
+                    cat,
+                    `₹${amount.toLocaleString('en-IN')}`
+                ]);
+
+                autoTable(doc, {
+                    startY: yPos + 4,
+                    head: [['Category', 'Budget Amount']],
+                    body: incomeRows,
+                    styles: { fontSize: 10 },
+                    headStyles: { fillColor: [79, 70, 229] },
+                    columnStyles: { 1: { halign: 'right' } },
+                });
+
+                yPos = (doc as any).lastAutoTable.finalY + 15;
+            }
+
+            // Expense Section
+            if (expenseData.length > 0) {
+                doc.setFontSize(14);
+                doc.text('Expense Budget', 14, yPos);
+
+                const expenseByCategory: Record<string, number> = {};
+                expenseData.forEach((d: any) => {
+                    const cat = d.Category || 'Uncategorized';
+                    expenseByCategory[cat] = (expenseByCategory[cat] || 0) + Number(d.Budget);
+                });
+
+                const expenseRows = Object.entries(expenseByCategory).map(([cat, amount]) => [
+                    cat,
+                    `₹${amount.toLocaleString('en-IN')}`
+                ]);
+
+                autoTable(doc, {
+                    startY: yPos + 4,
+                    head: [['Category', 'Budget Amount']],
+                    body: expenseRows,
+                    styles: { fontSize: 10 },
+                    headStyles: { fillColor: [220, 38, 38] }, // Red for expenses
+                    columnStyles: { 1: { halign: 'right' } },
+                });
+            }
 
             doc.save(`budget_summary_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-            toast({ title: 'Summary PDF exported', description: 'Dashboard-style summary exported' });
+            toast({ title: 'Summary PDF exported', description: 'Budget summary exported' });
         } catch (error: any) {
+            console.error(error);
             toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
         } finally {
             setLoading(false);
@@ -161,6 +227,7 @@ export function ExportBudget() {
                             <table className="w-full border">
                                 <thead className="bg-muted">
                                     <tr>
+                                        <th className="p-2 text-left">Type</th>
                                         <th className="p-2 text-left">Category</th>
                                         <th className="p-2 text-left">Item</th>
                                         <th className="p-2 text-right">Budget (₹)</th>
@@ -169,6 +236,12 @@ export function ExportBudget() {
                                 <tbody>
                                     {viewData.map((row, idx) => (
                                         <tr key={idx} className="border-t">
+                                            <td className="p-2">
+                                                <span className={`px-2 py-1 rounded text-xs ${row.Type === 'Income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                    {row.Type}
+                                                </span>
+                                            </td>
                                             <td className="p-2">{row.Category}</td>
                                             <td className="p-2">{row.Item}</td>
                                             <td className="p-2 text-right">₹{row.Budget.toLocaleString('en-IN')}</td>
