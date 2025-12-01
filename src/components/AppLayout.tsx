@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
+import { AutoLogout } from '@/components/AutoLogout';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['treasurer', 'accountant', 'general', 'lead'] },
@@ -72,7 +73,17 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-transparent relative">
+      <AutoLogout />
+
+      {/* Background Image Wrapper */}
+      <div
+        className="fixed inset-0 z-[-50] bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/background-image.jpg')" }}
+      />
+      {/* Overlay */}
+      <div className="fixed inset-0 z-[-40] bg-background/30 backdrop-blur-[1px]" />
+
       {/* Mobile Header */}
       <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-16 items-center px-4 justify-between">
