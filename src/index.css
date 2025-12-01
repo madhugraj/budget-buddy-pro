@@ -119,7 +119,7 @@ All colors MUST be HSL.
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
-  
+
   /* Add a semi-transparent overlay to ensure text readability */
   body::before {
     content: "";
@@ -128,11 +128,13 @@ All colors MUST be HSL.
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(255, 255, 255, 0.85); /* Light overlay for light mode */
+    background-color: rgba(255, 255, 255, 0.5);
+    /* Light overlay for light mode */
     z-index: -1;
   }
 
   .dark body::before {
-    background-color: rgba(15, 10, 25, 0.9); /* Dark overlay for dark mode */
+    background-color: rgba(15, 10, 25, 0.7);
+    /* Dark overlay for dark mode */
   }
 }

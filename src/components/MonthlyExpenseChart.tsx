@@ -43,11 +43,11 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
             <div className="border-t border-border pt-1 mt-1">
               <p className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Variance:</span>
-                <span className={`font-semibold ${isWithinBudget ? 'text-success' : 'text-destructive'}`}>
+                <span className={`font-semibold ${isWithinBudget ? 'text-primary' : 'text-destructive'}`}>
                   {formatCurrency(Math.abs(variance))}
                 </span>
               </p>
-              <p className={`text-xs font-medium mt-1 ${isWithinBudget ? 'text-success' : 'text-destructive'}`}>
+              <p className={`text-xs font-medium mt-1 ${isWithinBudget ? 'text-primary' : 'text-destructive'}`}>
                 {isWithinBudget ? 'Within Budget' : 'Over Budget'}
               </p>
             </div>
@@ -68,21 +68,21 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
         <ResponsiveContainer width="100%" height={350}>
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis 
-              dataKey="month" 
+            <XAxis
+              dataKey="month"
               className="text-xs"
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
             />
-            <YAxis 
+            <YAxis
               tickFormatter={formatCurrency}
               className="text-xs"
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            <Bar 
-              dataKey="budget" 
-              fill="hsl(var(--primary))" 
+            <Bar
+              dataKey="budget"
+              fill="hsl(var(--primary))"
               name="Monthly Budget"
               radius={[4, 4, 0, 0]}
               isAnimationActive={true}
@@ -90,9 +90,9 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
               animationDuration={1500}
               animationEasing="ease-out"
             />
-            <Bar 
-              dataKey="amount" 
-              fill="hsl(var(--accent))" 
+            <Bar
+              dataKey="amount"
+              fill="hsl(var(--accent))"
               name="Actual Spent"
               radius={[4, 4, 0, 0]}
               isAnimationActive={true}

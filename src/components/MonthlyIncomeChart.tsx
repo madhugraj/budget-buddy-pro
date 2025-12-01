@@ -29,8 +29,8 @@ export const MonthlyIncomeChart = ({ data }: MonthlyIncomeChartProps) => {
   };
 
   // Calculate average monthly budget for reference line
-  const avgBudget = data.length > 0 
-    ? data.reduce((sum, d) => sum + d.budget, 0) / data.length 
+  const avgBudget = data.length > 0
+    ? data.reduce((sum, d) => sum + d.budget, 0) / data.length
     : 0;
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -48,7 +48,7 @@ export const MonthlyIncomeChart = ({ data }: MonthlyIncomeChartProps) => {
           <p className="text-muted-foreground">
             Budget: <span className="text-foreground font-medium">{formatCurrency(budget)}</span>
           </p>
-          <p className={Number(achievement) >= 100 ? "text-green-600" : "text-amber-600"}>
+          <p className={Number(achievement) >= 100 ? "text-primary" : "text-amber-600"}>
             {achievement}% achieved
           </p>
         </div>
@@ -62,13 +62,13 @@ export const MonthlyIncomeChart = ({ data }: MonthlyIncomeChartProps) => {
       <h3 className="text-sm font-medium mb-3 text-foreground">Monthly Income</h3>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={data} barCategoryGap="20%">
-          <XAxis 
-            dataKey="month" 
+          <XAxis
+            dataKey="month"
             axisLine={false}
             tickLine={false}
             tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
           />
-          <YAxis 
+          <YAxis
             tickFormatter={formatCompact}
             axisLine={false}
             tickLine={false}
@@ -76,15 +76,15 @@ export const MonthlyIncomeChart = ({ data }: MonthlyIncomeChartProps) => {
             width={50}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.3)' }} />
-          <ReferenceLine 
-            y={avgBudget} 
-            stroke="hsl(var(--muted-foreground))" 
-            strokeDasharray="4 4" 
+          <ReferenceLine
+            y={avgBudget}
+            stroke="hsl(var(--muted-foreground))"
+            strokeDasharray="4 4"
             strokeWidth={1}
           />
-          <Bar 
-            dataKey="actual" 
-            fill="hsl(var(--primary))" 
+          <Bar
+            dataKey="actual"
+            fill="hsl(var(--primary))"
             radius={[3, 3, 0, 0]}
           />
         </BarChart>

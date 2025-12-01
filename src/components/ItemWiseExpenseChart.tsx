@@ -28,12 +28,12 @@ const COLORS = [
   'hsl(var(--chart-5))',
 ];
 
-export function ItemWiseExpenseChart({ 
-  data, 
-  allCategories, 
+export function ItemWiseExpenseChart({
+  data,
+  allCategories,
   allCommittees,
   onCategoryChange,
-  onCommitteeChange 
+  onCommitteeChange
 }: ItemWiseExpenseChartProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedCommittee, setSelectedCommittee] = useState<string>('all');
@@ -77,19 +77,18 @@ export function ItemWiseExpenseChart({
             </div>
             <div className="flex justify-between gap-6">
               <span className="text-muted-foreground">Budget Utilization:</span>
-              <span className={`font-semibold ${
-                data.utilization > 100 ? 'text-destructive' : 
-                data.utilization > 80 ? 'text-warning' : 'text-success'
-              }`}>
+              <span className={`font-semibold ${data.utilization > 100 ? 'text-destructive' :
+                  data.utilization > 80 ? 'text-warning' : 'text-primary'
+                }`}>
                 {data.utilization.toFixed(1)}%
               </span>
             </div>
             <div className="pt-2 mt-2 border-t border-border text-xs text-muted-foreground">
-              {data.utilization > 100 
-                ? '⚠ Over budget' 
-                : data.utilization > 80 
-                ? '⚡ Near limit' 
-                : '✓ Within budget'}
+              {data.utilization > 100
+                ? '⚠ Over budget'
+                : data.utilization > 80
+                  ? '⚡ Near limit'
+                  : '✓ Within budget'}
             </div>
           </div>
         </div>
@@ -101,7 +100,7 @@ export function ItemWiseExpenseChart({
   const getBarColor = (utilization: number) => {
     if (utilization > 100) return 'hsl(var(--destructive))';
     if (utilization > 80) return 'hsl(var(--warning))';
-    return 'hsl(var(--success))';
+    return 'hsl(var(--primary))';
   };
 
   return (
@@ -137,22 +136,22 @@ export function ItemWiseExpenseChart({
         <div className="w-full overflow-x-auto">
           <div className="min-w-[500px]">
             <ResponsiveContainer width="100%" height={350}>
-              <BarChart 
-                data={data} 
+              <BarChart
+                data={data}
                 layout="vertical"
                 margin={{ left: 10, right: 10, top: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-                <XAxis 
+                <XAxis
                   type="number"
                   tickFormatter={formatCompactCurrency}
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
                   axisLine={false}
                 />
-                <YAxis 
+                <YAxis
                   type="category"
-                  dataKey="item_name" 
+                  dataKey="item_name"
                   width={120}
                   className="text-xs"
                   tick={{ fill: 'hsl(var(--muted-foreground))' }}
@@ -160,15 +159,15 @@ export function ItemWiseExpenseChart({
                   axisLine={false}
                 />
                 <Tooltip content={<CustomTooltip />} />
-            <Bar 
-              dataKey="amount" 
-              radius={[0, 4, 4, 0]}
-              barSize={28}
-              isAnimationActive={true}
-              animationBegin={0}
-              animationDuration={1800}
-              animationEasing="ease-out"
-            >
+                <Bar
+                  dataKey="amount"
+                  radius={[0, 4, 4, 0]}
+                  barSize={28}
+                  isAnimationActive={true}
+                  animationBegin={0}
+                  animationDuration={1800}
+                  animationEasing="ease-out"
+                >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={getBarColor(entry.utilization)} />
                   ))}
@@ -179,7 +178,7 @@ export function ItemWiseExpenseChart({
         </div>
         <div className="mt-3 flex items-center justify-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm bg-success"></div>
+            <div className="w-2.5 h-2.5 rounded-sm bg-primary"></div>
             <span className="text-muted-foreground">&lt;80%</span>
           </div>
           <div className="flex items-center gap-1.5">
