@@ -64,6 +64,20 @@ interface Income {
   };
 }
 
+interface PettyCash {
+  id: string;
+  item_name: string;
+  description: string;
+  amount: number;
+  date: string;
+  status: string;
+  created_at: string;
+  profiles: {
+    full_name: string;
+    email: string;
+  };
+}
+
 interface AuditLog {
   id: string;
   action: string;
@@ -101,6 +115,7 @@ export default function Corrections() {
   // Historical Data tab states
   const [historicalExpenses, setHistoricalExpenses] = useState<Expense[]>([]);
   const [historicalIncome, setHistoricalIncome] = useState<Income[]>([]);
+  const [historicalPettyCash, setHistoricalPettyCash] = useState<PettyCash[]>([]);
   const [historicalLoading, setHistoricalLoading] = useState(false);
   const [selectedHistorical, setSelectedHistorical] = useState<Set<string>>(new Set());
   const [dateFrom, setDateFrom] = useState<string>('2025-04-01');
@@ -109,7 +124,7 @@ export default function Corrections() {
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [historicalType, setHistoricalType] = useState<'expenses' | 'income'>('expenses');
+  const [historicalType, setHistoricalType] = useState<'expenses' | 'income' | 'petty_cash'>('expenses');
 
   // Income Edit States
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
@@ -164,8 +179,10 @@ export default function Corrections() {
     if (userRole === 'accountant' || userRole === 'treasurer') {
       if (historicalType === 'expenses') {
         loadHistoricalExpenses();
-      } else {
+      } else if (historicalType === 'income') {
         loadHistoricalIncome();
+      } else if (historicalType === 'petty_cash') {
+        loadHistoricalPettyCash();
       }
     }
   }, [dateFrom, dateTo, userRole, historicalType]);
@@ -276,7 +293,7 @@ export default function Corrections() {
       const toDate = new Date(dateTo);
       const fromMonth = fromDate.getMonth() + 1; // 1-12
       const toMonth = toDate.getMonth() + 1; // 1-12
-      
+
       // First fetch income data without the profile join
       let query = supabase
         .from('income_actuals')
@@ -297,7 +314,7 @@ export default function Corrections() {
           )
         `)
         .eq('status', 'approved');
-      
+
       // Filter by month range (accounting months)
       if (fromMonth <= toMonth) {
         // Same direction range (e.g., April to October: 4-10)
@@ -306,7 +323,7 @@ export default function Corrections() {
         // Wrapping range (e.g., October to March: 10-12 OR 1-3)
         query = query.or(`month.gte.${fromMonth},month.lte.${toMonth}`);
       }
-      
+
       const { data: incomeData, error } = await query.order('month', { ascending: false });
 
       if (error) throw error;
@@ -340,6 +357,32 @@ export default function Corrections() {
     } catch (error: any) {
       toast({
         title: 'Error loading historical income',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setHistoricalLoading(false);
+    }
+  };
+
+  const loadHistoricalPettyCash = async () => {
+    if (userRole !== 'accountant' && userRole !== 'treasurer') return;
+
+    setHistoricalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('petty_cash')
+        .select('*, profiles!petty_cash_submitted_by_fkey (full_name, email)')
+        .eq('status', 'approved')
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setHistoricalPettyCash((data || []) as unknown as PettyCash[]);
+    } catch (error: any) {
+      toast({
+        title: 'Error loading historical petty cash',
         description: error.message,
         variant: 'destructive',
       });
@@ -969,6 +1012,7 @@ export default function Corrections() {
                       <SelectContent>
                         <SelectItem value="expenses">Expenses</SelectItem>
                         <SelectItem value="income">Income</SelectItem>
+                        <SelectItem value="petty_cash">Petty Cash</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
