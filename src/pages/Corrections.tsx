@@ -1050,7 +1050,7 @@ export default function Corrections() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>
-                      Historical {historicalType === 'expenses' ? 'Expenses' : 'Income'} ({historicalType === 'expenses' ? historicalExpenses.length : historicalIncome.length})
+                      Historical {historicalType === 'expenses' ? 'Expenses' : historicalType === 'income' ? 'Income' : 'Petty Cash'} ({historicalType === 'expenses' ? historicalExpenses.length : historicalType === 'income' ? historicalIncome.length : historicalPettyCash.length})
                     </CardTitle>
                     {historicalType === 'expenses' && userRole === 'accountant' && selectedHistorical.size > 0 && (
                       <div className="flex items-center gap-2">
@@ -1177,7 +1177,7 @@ export default function Corrections() {
                         </TableBody>
                       </Table>
                     )
-                  ) : (
+                  ) : historicalType === 'income' ? (
                     // Income Table
                     historicalIncome.length === 0 ? (
                       <div className="py-12 text-center">
@@ -1249,6 +1249,45 @@ export default function Corrections() {
                                   </Button>
                                 </TableCell>
                               )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )
+                  ) : (
+                    // Petty Cash Table
+                    historicalPettyCash.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No historical petty cash found for the selected filters</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Submitted By</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {historicalPettyCash.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell className="text-sm">
+                                {new Date(item.date).toLocaleDateString('en-IN')}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{item.item_name}</TableCell>
+                              <TableCell className="text-sm max-w-[200px] truncate">
+                                {item.description || '-'}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {item.profiles?.full_name || 'N/A'}
+                              </TableCell>
+                              <TableCell className="text-right text-sm font-medium">
+                                {formatCurrency(item.amount)}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
