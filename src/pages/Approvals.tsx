@@ -88,6 +88,15 @@ interface PettyCash {
 }
 
 export default function Approvals() {
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const getMonthName = (monthNum: number) => {
+    return monthNames[monthNum - 1] || 'Unknown';
+  };
+
   const [pendingExpenses, setPendingExpenses] = useState<Expense[]>([]);
   const [pendingIncome, setPendingIncome] = useState<Income[]>([]);
   const [pendingPettyCash, setPendingPettyCash] = useState<PettyCash[]>([]);
@@ -601,6 +610,47 @@ export default function Approvals() {
     }
   };
 
+  const handleBulkRejectPettyCash = async () => {
+    if (selectedPettyCashIds.size === 0) {
+      toast({
+        title: 'No items selected',
+        description: 'Please select at least one petty cash request to reject',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const pettyCashIds = Array.from(selectedPettyCashIds);
+
+      const { error } = await supabase
+        .from('petty_cash')
+        .update({
+          status: 'rejected',
+        })
+        .in('id', pettyCashIds);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success!',
+        description: `Rejected ${pettyCashIds.length} petty cash request(s)`,
+      });
+
+      setSelectedPettyCashIds(new Set());
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error rejecting petty cash',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleApprovePettyCash = async (id: string) => {
     setProcessing(true);
     try {
@@ -819,6 +869,9 @@ export default function Approvals() {
                         <div className="text-sm text-muted-foreground">
                           {income.profiles.full_name} • {new Date(income.created_at).toLocaleDateString()}
                         </div>
+                        <div className="text-sm font-medium text-primary">
+                          {getMonthName(income.month)} {income.fiscal_year}
+                        </div>
                         <div className="text-sm text-muted-foreground">
                           {income.notes}
                         </div>
@@ -923,23 +976,43 @@ export default function Approvals() {
                       {selectedPettyCashIds.size === pendingPettyCash.length ? 'Deselect All' : 'Select All'}
                     </Button>
                     {selectedPettyCashIds.size > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={handleBulkApprovePettyCash}
-                        disabled={processing}
-                      >
-                        {processing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Approving...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Approve Selected ({selectedPettyCashIds.size})
-                          </>
-                        )}
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkApprovePettyCash}
+                          disabled={processing}
+                        >
+                          {processing ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Approve ({selectedPettyCashIds.size})
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleBulkRejectPettyCash}
+                          disabled={processing}
+                        >
+                          {processing ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Reject ({selectedPettyCashIds.size})
+                            </>
+                          )}
+                        </Button>
+                      </>
                     )}
                   </div>
                 )}
@@ -1255,6 +1328,11 @@ export default function Approvals() {
                 <div>
                   <Label className="text-muted-foreground">Date</Label>
                   <div className="font-medium">{new Date(selectedIncome.created_at).toLocaleDateString()}</div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">For Month</Label>
+                  <div className="font-medium">{getMonthName(selectedIncome.month)} {selectedIncome.fiscal_year}
+                  </div>
                 </div>
                 {selectedIncome.notes && (
                   <div className="col-span-2">
