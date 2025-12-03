@@ -135,7 +135,9 @@ export type Database = {
       }
       cam_tracking: {
         Row: {
+          advance_payments: number
           created_at: string
+          dues_cleared_from_previous: number
           id: string
           notes: string | null
           paid_flats: number
@@ -148,7 +150,9 @@ export type Database = {
           year: number
         }
         Insert: {
+          advance_payments?: number
           created_at?: string
+          dues_cleared_from_previous?: number
           id?: string
           notes?: string | null
           paid_flats?: number
@@ -161,7 +165,9 @@ export type Database = {
           year: number
         }
         Update: {
+          advance_payments?: number
           created_at?: string
+          dues_cleared_from_previous?: number
           id?: string
           notes?: string | null
           paid_flats?: number
