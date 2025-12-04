@@ -60,10 +60,8 @@ interface PettyCashItemData {
 }
 interface MonthlyCAMData {
   month: string;
-  actual: number;
+  paid_flats: number;
 }
-
-const CAM_RATE_PER_FLAT = 3500;
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -157,22 +155,22 @@ export default function Dashboard() {
       if (error) throw error;
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-      const monthlyStats: Record<number, { actual: number }> = {};
+      const monthlyStats: Record<number, { paid_flats: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
         // Map index 0-11 to month numbers: Apr(4) to Mar(3 next year)
         // 0->4, 1->5... 8->12, 9->1, 10->2, 11->3
         const monthNum = index < 9 ? index + 4 : index - 8;
-        monthlyStats[monthNum] = { actual: 0 };
+        monthlyStats[monthNum] = { paid_flats: 0 };
       });
 
       data?.forEach(item => {
         if (item.month) {
           if (!monthlyStats[item.month]) {
-            monthlyStats[item.month] = { actual: 0 };
+            monthlyStats[item.month] = { paid_flats: 0 };
           }
-          monthlyStats[item.month].actual += (item.paid_flats * CAM_RATE_PER_FLAT);
+          monthlyStats[item.month].paid_flats += item.paid_flats;
         }
       });
 
@@ -180,7 +178,7 @@ export default function Dashboard() {
         const monthNum = index < 9 ? index + 4 : index - 8;
         return {
           month,
-          actual: monthlyStats[monthNum]?.actual || 0
+          paid_flats: monthlyStats[monthNum]?.paid_flats || 0
         };
       });
 
