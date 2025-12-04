@@ -521,7 +521,7 @@ export default function Dashboard() {
         // Special display name for "Others" category
         let displayName = parent.category_name;
         if (parent.category_name === 'Others') {
-          displayName = 'Miscellaneous Income (Move In/Move Out)';
+          displayName = 'Move In-Out (Misc)';
         }
         // Truncate long names
         displayName = displayName.length > 45 ? displayName.substring(0, 45) + '...' : displayName;
