@@ -91,11 +91,11 @@ export default function Dashboard() {
         .from('petty_cash')
         .select('amount, date, item_name')
         .eq('status', 'approved')
-        .gte('date', '2025-04-01')
-        .lte('date', '2025-10-31')
         .order('date');
 
       if (error) throw error;
+
+      console.log('Petty Cash Data loaded:', data);
 
       // Process monthly data
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
@@ -149,18 +149,18 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('cam_tracking')
-        .select('month, paid_flats')
-        .eq('year', 2025); // Assuming current year for now
+        .select('month, paid_flats, year, status')
+        .eq('status', 'approved'); // Only show approved CAM data
 
       if (error) throw error;
+
+      console.log('CAM Data loaded:', data);
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyStats: Record<number, { paid_flats: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
-        // Map index 0-11 to month numbers: Apr(4) to Mar(3 next year)
-        // 0->4, 1->5... 8->12, 9->1, 10->2, 11->3
         const monthNum = index < 9 ? index + 4 : index - 8;
         monthlyStats[monthNum] = { paid_flats: 0 };
       });
@@ -182,6 +182,7 @@ export default function Dashboard() {
         };
       });
 
+      console.log('CAM Chart Data:', chartData);
       setMonthlyCAMData(chartData);
 
     } catch (error: any) {
@@ -389,6 +390,8 @@ export default function Dashboard() {
         error: actualError
       } = await supabase.from('income_actuals').select('category_id, actual_amount, gst_amount, month').eq('fiscal_year', 'FY25-26').eq('status', 'approved');
       if (actualError) throw actualError;
+
+      console.log('Income Data loaded:', actualData);
 
       // Process monthly income data by the month field (which month the income is FOR)
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
