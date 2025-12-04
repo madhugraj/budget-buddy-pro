@@ -390,16 +390,27 @@ export default function Dashboard() {
         error: allActualError
       } = await supabase.from('income_actuals').select('category_id, actual_amount, gst_amount, month, fiscal_year, status');
 
-      if (allActualError) throw allActualError;
+      if (allActualError) {
+        console.error('Error fetching income actuals:', allActualError);
+        throw allActualError;
+      }
 
+      console.log('=== INCOME DATA DEBUG ===');
       console.log('ALL Income Data (before filtering):', allActualData);
+      console.log('Total records:', allActualData?.length || 0);
       console.log('Fiscal years found:', [...new Set(allActualData?.map(d => d.fiscal_year))]);
       console.log('Statuses found:', [...new Set(allActualData?.map(d => d.status))]);
 
-      // Get actual income data (approved only for FY25-26)
-      const actualData = allActualData?.filter(d => d.status === 'approved') || [];
+      // Get actual income data (approved only)
+      const actualData = (allActualData || []).filter(d => d.status === 'approved');
 
       console.log('Approved Income Data:', actualData);
+      console.log('Approved records count:', actualData.length);
+      console.log('=== END INCOME DATA DEBUG ===');
+
+      if (!actualData || actualData.length === 0) {
+        console.warn('⚠️ No approved income data found! Check if records have status="approved"');
+      }
 
       // Process monthly income data by the month field (which month the income is FOR)
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
@@ -415,6 +426,9 @@ export default function Dashboard() {
           monthlyActuals[adjustedIndex] = (monthlyActuals[adjustedIndex] || 0) + totalIncome;
         }
       });
+
+      console.log('Monthly actuals aggregated:', monthlyActuals);
+
       const totalAnnualBudget = budgetData?.reduce((sum, item) => sum + Number(item.budgeted_amount), 0) || 0;
       const monthlyBudget = totalAnnualBudget / 12;
       const monthlyIncomeChartData = months.map((month, index) => ({
@@ -422,6 +436,8 @@ export default function Dashboard() {
         actual: monthlyActuals[index] || 0,
         budget: monthlyBudget
       }));
+
+      console.log('Final monthly income chart data:', monthlyIncomeChartData);
       setMonthlyIncomeData(monthlyIncomeChartData);
 
       // Process category-wise income data (aggregate by parent category)
