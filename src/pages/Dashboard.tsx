@@ -11,6 +11,7 @@ import { ItemWiseExpenseChart } from '@/components/ItemWiseExpenseChart';
 import { MonthlyIncomeChart } from '@/components/MonthlyIncomeChart';
 import { CategoryWiseIncomeChart } from '@/components/CategoryWiseIncomeChart';
 import { MonthlyCAMChart } from '@/components/MonthlyCAMChart';
+import { TowerCAMChart } from '@/components/TowerCAMChart';
 import { ItemAnalysisCard } from '@/components/ItemAnalysisCard';
 import { BudgetMeter } from '@/components/BudgetMeter';
 import { OverBudgetAlert } from '@/components/OverBudgetAlert';
@@ -63,6 +64,14 @@ interface MonthlyCAMData {
   paid_flats: number;
 }
 
+interface TowerCAMData {
+  tower: string;
+  paid_flats: number;
+  pending_flats: number;
+  total_flats: number;
+  payment_rate: string | number;
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -75,6 +84,7 @@ export default function Dashboard() {
   const [monthlyPettyCashData, setMonthlyPettyCashData] = useState<MonthlyPettyCashData[]>([]);
   const [pettyCashItemData, setPettyCashItemData] = useState<PettyCashItemData[]>([]);
   const [monthlyCAMData, setMonthlyCAMData] = useState<MonthlyCAMData[]>([]);
+  const [towerCAMData, setTowerCAMData] = useState<TowerCAMData[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartKey, setChartKey] = useState(0);
   const {
@@ -149,7 +159,7 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('cam_tracking')
-        .select('month, paid_flats, year, status')
+        .select('tower, month, paid_flats, pending_flats, total_flats, year, status')
         .eq('status', 'approved'); // Only show approved CAM data
 
       if (error) throw error;
@@ -158,6 +168,7 @@ export default function Dashboard() {
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyStats: Record<number, { paid_flats: number }> = {};
+      const towerStats: Record<string, { paid_flats: number; pending_flats: number; total_flats: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
@@ -166,15 +177,25 @@ export default function Dashboard() {
       });
 
       data?.forEach(item => {
+        // Monthly aggregation
         if (item.month) {
           if (!monthlyStats[item.month]) {
             monthlyStats[item.month] = { paid_flats: 0 };
           }
           monthlyStats[item.month].paid_flats += item.paid_flats;
         }
+
+        // Tower-wise aggregation (sum across all months for each tower)
+        if (item.tower) {
+          if (!towerStats[item.tower]) {
+            towerStats[item.tower] = { paid_flats: 0, pending_flats: 0, total_flats: item.total_flats || 0 };
+          }
+          towerStats[item.tower].paid_flats += item.paid_flats;
+          towerStats[item.tower].pending_flats += item.pending_flats;
+        }
       });
 
-      const chartData = months.map((month, index) => {
+      const monthlyChartData = months.map((month, index) => {
         const monthNum = index < 9 ? index + 4 : index - 8;
         return {
           month,
@@ -182,8 +203,22 @@ export default function Dashboard() {
         };
       });
 
-      console.log('CAM Chart Data:', chartData);
-      setMonthlyCAMData(chartData);
+      // Convert tower stats to array for chart
+      const towerChartData = Object.entries(towerStats)
+        .map(([tower, stats]) => ({
+          tower,
+          paid_flats: stats.paid_flats,
+          pending_flats: stats.pending_flats,
+          total_flats: stats.total_flats,
+          payment_rate: stats.total_flats > 0 ? (stats.paid_flats / stats.total_flats * 100).toFixed(1) : 0
+        }))
+        .sort((a, b) => a.tower.localeCompare(b.tower, undefined, { numeric: true }));
+
+      console.log('CAM Monthly Chart Data:', monthlyChartData);
+      console.log('CAM Tower Chart Data:', towerChartData);
+
+      setMonthlyCAMData(monthlyChartData);
+      setTowerCAMData(towerChartData);
 
     } catch (error: any) {
       console.error('Error loading CAM data:', error);
@@ -708,6 +743,10 @@ export default function Dashboard() {
                 <MonthlyCAMChart data={monthlyCAMData} />
               </CardContent>
             </Card>
+          </div>
+
+          <div className="w-full overflow-hidden">
+            <TowerCAMChart data={towerCAMData} />
           </div>
         </TabsContent>
 
