@@ -26,7 +26,8 @@ interface MissingEntry {
 export default function MissingDataReport() {
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(true);
-    const [selectedMonth, setSelectedMonth] = useState<string>('all');
+    const [fromMonth, setFromMonth] = useState<string>('Apr');
+    const [toMonth, setToMonth] = useState<string>('Mar');
     const [selectedType, setSelectedType] = useState<string>('all');
     const [missingData, setMissingData] = useState<MissingEntry[]>([]);
 
@@ -148,9 +149,27 @@ export default function MissingDataReport() {
         }
     };
 
+    // Filter by month range
+    const getMonthIndex = (month: string) => MONTHS.indexOf(month);
+
     const filteredData = missingData.filter(item => {
-        if (selectedMonth !== 'all' && item.month !== selectedMonth) return false;
+        // Type filter
         if (selectedType !== 'all' && item.type !== selectedType) return false;
+
+        // Month range filter
+        const itemMonthIndex = getMonthIndex(item.month);
+        const fromIndex = getMonthIndex(fromMonth);
+        const toIndex = getMonthIndex(toMonth);
+
+        // Handle wrap-around (e.g., Oct to Mar crosses year boundary)
+        if (fromIndex <= toIndex) {
+            // Normal range (e.g., Apr to Sep)
+            if (itemMonthIndex < fromIndex || itemMonthIndex > toIndex) return false;
+        } else {
+            // Wrap-around range (e.g., Oct to Mar)
+            if (itemMonthIndex < fromIndex && itemMonthIndex > toIndex) return false;
+        }
+
         return true;
     });
 
@@ -205,22 +224,34 @@ export default function MissingDataReport() {
                     <CardDescription>Filter missing entries by month and type</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="text-sm font-medium mb-2 block">Month</label>
-                            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">From Month</label>
+                            <Select value={fromMonth} onValueChange={setFromMonth}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Months</SelectItem>
                                     {MONTHS.map(month => (
                                         <SelectItem key={month} value={month}>{month}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="flex-1">
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">To Month</label>
+                            <Select value={toMonth} onValueChange={setToMonth}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MONTHS.map(month => (
+                                        <SelectItem key={month} value={month}>{month}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
                             <label className="text-sm font-medium mb-2 block">Type</label>
                             <Select value={selectedType} onValueChange={setSelectedType}>
                                 <SelectTrigger>
