@@ -2,7 +2,6 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } fro
 
 interface MonthlyCAMData {
     month: string;
-    projected: number;
     actual: number;
 }
 
@@ -23,7 +22,7 @@ export function MonthlyCAMChart({ data }: MonthlyCAMChartProps) {
         <div className="h-[300px] w-full">
             <div className="mb-4">
                 <h3 className="text-lg font-medium">Monthly CAM Collection</h3>
-                <p className="text-sm text-muted-foreground">Projected vs Actual Collection</p>
+                <p className="text-sm text-muted-foreground">Actual Collection Amount</p>
             </div>
             <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data}>
@@ -42,19 +41,13 @@ export function MonthlyCAMChart({ data }: MonthlyCAMChartProps) {
                         tickFormatter={(value) => `₹${value / 1000}k`}
                     />
                     <Tooltip
-                        formatter={(value: number) => [formatCurrency(value), '']}
+                        formatter={(value: number) => [formatCurrency(value), 'Collection']}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     />
                     <Legend />
                     <Bar
-                        dataKey="projected"
-                        name="Projected"
-                        fill="#e2e8f0"
-                        radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
                         dataKey="actual"
-                        name="Actual"
+                        name="Collection"
                         fill="#8b5cf6"
                         radius={[4, 4, 0, 0]}
                     />

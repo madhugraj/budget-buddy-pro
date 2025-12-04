@@ -60,7 +60,6 @@ interface PettyCashItemData {
 }
 interface MonthlyCAMData {
   month: string;
-  projected: number;
   actual: number;
 }
 
@@ -152,28 +151,27 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase
         .from('cam_tracking')
-        .select('month, paid_flats, total_flats')
+        .select('month, paid_flats')
         .eq('year', 2025); // Assuming current year for now
 
       if (error) throw error;
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-      const monthlyStats: Record<number, { projected: number; actual: number }> = {};
+      const monthlyStats: Record<number, { actual: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
         // Map index 0-11 to month numbers: Apr(4) to Mar(3 next year)
         // 0->4, 1->5... 8->12, 9->1, 10->2, 11->3
         const monthNum = index < 9 ? index + 4 : index - 8;
-        monthlyStats[monthNum] = { projected: 0, actual: 0 };
+        monthlyStats[monthNum] = { actual: 0 };
       });
 
       data?.forEach(item => {
         if (item.month) {
           if (!monthlyStats[item.month]) {
-            monthlyStats[item.month] = { projected: 0, actual: 0 };
+            monthlyStats[item.month] = { actual: 0 };
           }
-          monthlyStats[item.month].projected += (item.total_flats * CAM_RATE_PER_FLAT);
           monthlyStats[item.month].actual += (item.paid_flats * CAM_RATE_PER_FLAT);
         }
       });
@@ -182,7 +180,6 @@ export default function Dashboard() {
         const monthNum = index < 9 ? index + 4 : index - 8;
         return {
           month,
-          projected: monthlyStats[monthNum]?.projected || 0,
           actual: monthlyStats[monthNum]?.actual || 0
         };
       });
