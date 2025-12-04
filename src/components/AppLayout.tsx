@@ -16,6 +16,7 @@ import {
   Plus,
   Edit3,
   Building2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Sheet,
@@ -36,6 +37,7 @@ const navigation = [
   { name: 'Corrections', href: '/corrections', icon: Edit3, roles: ['accountant', 'treasurer'] },
   { name: 'User Management', href: '/user-management', icon: UserCog, roles: ['treasurer'] },
   { name: 'Reports', href: '/reports', icon: FileBarChart, roles: ['treasurer', 'accountant', 'lead'] },
+  { name: 'Missing Data Report', href: '/missing-data-report', icon: AlertCircle, roles: ['treasurer'] },
   { name: 'Petty Cash', href: '/petty-cash', icon: Receipt, roles: ['treasurer', 'lead', 'accountant'] },
   { name: 'CAM Tracking', href: '/cam-tracking', icon: Building2, roles: ['treasurer', 'lead'] },
   { name: 'Historical Data', href: '/historical', icon: History, roles: ['treasurer', 'accountant'] },

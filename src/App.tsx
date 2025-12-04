@@ -19,6 +19,7 @@ import UserManagement from "./pages/UserManagement";
 import Reports from "./pages/Reports";
 import PettyCash from "./pages/PettyCash";
 import CAMTracking from "./pages/CAMTracking";
+import MissingDataReport from "./pages/MissingDataReport";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -154,6 +155,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AppLayout>
                     <CAMTracking />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/missing-data-report"
+              element={
+                <ProtectedRoute requiredRole="treasurer">
+                  <AppLayout>
+                    <MissingDataReport />
                   </AppLayout>
                 </ProtectedRoute>
               }
