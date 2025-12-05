@@ -191,31 +191,38 @@ export default function Dashboard() {
       console.log('CAM Data loaded:', data);
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
-      const monthlyStats: Record<number, { paid_flats: number }> = {};
-      const towerStats: Record<string, { paid_flats: number; pending_flats: number; total_flats: number }> = {};
+      const monthlyPaidStats: Record<number, number> = {};
+      const monthlyPendingStats: Record<number, number> = {};
+      const towerLatestData: Record<string, { month: number; paid_flats: number; pending_flats: number; total_flats: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
         const monthNum = index < 9 ? index + 4 : index - 8;
-        monthlyStats[monthNum] = { paid_flats: 0 };
+        monthlyPaidStats[monthNum] = 0;
+        monthlyPendingStats[monthNum] = 0;
       });
 
       data?.forEach(item => {
-        // Monthly aggregation
+        // Monthly aggregation - sum all towers for each month
         if (item.month) {
-          if (!monthlyStats[item.month]) {
-            monthlyStats[item.month] = { paid_flats: 0 };
+          if (!monthlyPaidStats[item.month]) {
+            monthlyPaidStats[item.month] = 0;
+            monthlyPendingStats[item.month] = 0;
           }
-          monthlyStats[item.month].paid_flats += item.paid_flats;
+          monthlyPaidStats[item.month] += item.paid_flats;
+          monthlyPendingStats[item.month] += item.pending_flats;
         }
 
-        // Tower-wise aggregation (sum across all months for each tower)
-        if (item.tower) {
-          if (!towerStats[item.tower]) {
-            towerStats[item.tower] = { paid_flats: 0, pending_flats: 0, total_flats: item.total_flats || 0 };
+        // Tower-wise: Keep only the LATEST month's data for each tower (not cumulative!)
+        if (item.tower && item.month) {
+          if (!towerLatestData[item.tower] || item.month > towerLatestData[item.tower].month) {
+            towerLatestData[item.tower] = {
+              month: item.month,
+              paid_flats: item.paid_flats,
+              pending_flats: item.pending_flats,
+              total_flats: item.total_flats || 0
+            };
           }
-          towerStats[item.tower].paid_flats += item.paid_flats;
-          towerStats[item.tower].pending_flats += item.pending_flats;
         }
       });
 
@@ -223,12 +230,13 @@ export default function Dashboard() {
         const monthNum = index < 9 ? index + 4 : index - 8;
         return {
           month,
-          paid_flats: monthlyStats[monthNum]?.paid_flats || 0
+          paid_flats: monthlyPaidStats[monthNum] || 0,
+          pending_flats: monthlyPendingStats[monthNum] || 0
         };
       });
 
-      // Convert tower stats to array for chart
-      const towerChartData = Object.entries(towerStats)
+      // Convert tower stats to array for chart - using latest month's data
+      const towerChartData = Object.entries(towerLatestData)
         .map(([tower, stats]) => ({
           tower,
           paid_flats: stats.paid_flats,
