@@ -24,7 +24,7 @@ export function TowerCAMChart({ data }: TowerCAMChartProps) {
     return (
         <Card className="border-none shadow-lg">
             <CardHeader>
-                <CardTitle className="text-xl font-bold">Tower-wise CAM Collection (Latest Month)</CardTitle>
+                <CardTitle className="text-xl font-bold">Tower-wise CAM Collection</CardTitle>
                 <CardDescription>Current payment status per tower</CardDescription>
             </CardHeader>
             <CardContent>

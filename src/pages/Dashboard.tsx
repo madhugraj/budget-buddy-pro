@@ -16,8 +16,9 @@ import { ItemAnalysisCard } from '@/components/ItemAnalysisCard';
 import { BudgetMeter } from '@/components/BudgetMeter';
 import { OverBudgetAlert } from '@/components/OverBudgetAlert';
 import { RoleBadge } from '@/components/RoleBadge';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Filter } from 'lucide-react';
 import { PettyCashAnalytics } from '@/components/PettyCashAnalytics';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface DashboardStats {
   totalBudget: number;
@@ -72,6 +73,25 @@ interface TowerCAMData {
   payment_rate: string | number;
 }
 
+const CAM_MONTHS = [
+  { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
+  { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
+  { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' },
+  { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' }
+];
+
+const CAM_QUARTERS = [
+  { value: 1, label: 'Q1 (Apr-Jun)', months: [4, 5, 6] },
+  { value: 2, label: 'Q2 (Jul-Sep)', months: [7, 8, 9] },
+  { value: 3, label: 'Q3 (Oct-Dec)', months: [10, 11, 12] },
+  { value: 4, label: 'Q4 (Jan-Mar)', months: [1, 2, 3] }
+];
+
+const CAM_HALFYEARS = [
+  { value: 1, label: 'H1 (Apr-Sep)', months: [4, 5, 6, 7, 8, 9] },
+  { value: 2, label: 'H2 (Oct-Mar)', months: [10, 11, 12, 1, 2, 3] }
+];
+
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -85,6 +105,12 @@ export default function Dashboard() {
   const [pettyCashItemData, setPettyCashItemData] = useState<PettyCashItemData[]>([]);
   const [monthlyCAMData, setMonthlyCAMData] = useState<MonthlyCAMData[]>([]);
   const [towerCAMData, setTowerCAMData] = useState<TowerCAMData[]>([]);
+
+  // New State for CAM filtering
+  const [rawCAMData, setRawCAMData] = useState<any[]>([]);
+  const [camFilterType, setCamFilterType] = useState('latest');
+  const [camFilterValue, setCamFilterValue] = useState<string>('all');
+
   const [loading, setLoading] = useState(true);
   const [chartKey, setChartKey] = useState(0);
   const {
@@ -189,11 +215,11 @@ export default function Dashboard() {
       if (error) throw error;
 
       console.log('CAM Data loaded:', data);
+      setRawCAMData(data || []);
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyPaidStats: Record<number, number> = {};
       const monthlyPendingStats: Record<number, number> = {};
-      const towerLatestData: Record<string, { month: number; paid_flats: number; pending_flats: number; total_flats: number }> = {};
 
       // Initialize all months
       months.forEach((_, index) => {
@@ -213,17 +239,7 @@ export default function Dashboard() {
           monthlyPendingStats[item.month] += item.pending_flats;
         }
 
-        // Tower-wise: Keep only the LATEST month's data for each tower (not cumulative!)
-        if (item.tower && item.month) {
-          if (!towerLatestData[item.tower] || item.month > towerLatestData[item.tower].month) {
-            towerLatestData[item.tower] = {
-              month: item.month,
-              paid_flats: item.paid_flats,
-              pending_flats: item.pending_flats,
-              total_flats: item.total_flats || 0
-            };
-          }
-        }
+
       });
 
       const monthlyChartData = months.map((month, index) => {
@@ -235,22 +251,9 @@ export default function Dashboard() {
         };
       });
 
-      // Convert tower stats to array for chart - using latest month's data
-      const towerChartData = Object.entries(towerLatestData)
-        .map(([tower, stats]) => ({
-          tower,
-          paid_flats: stats.paid_flats,
-          pending_flats: stats.pending_flats,
-          total_flats: stats.total_flats,
-          payment_rate: stats.total_flats > 0 ? (stats.paid_flats / stats.total_flats * 100).toFixed(1) : 0
-        }))
-        .sort((a, b) => a.tower.localeCompare(b.tower, undefined, { numeric: true }));
-
       console.log('CAM Monthly Chart Data:', monthlyChartData);
-      console.log('CAM Tower Chart Data:', towerChartData);
 
       setMonthlyCAMData(monthlyChartData);
-      setTowerCAMData(towerChartData);
 
     } catch (error: any) {
       console.error('Error loading CAM data:', error);
@@ -261,6 +264,80 @@ export default function Dashboard() {
       });
     }
   };
+
+  // Effect to process tower data when filter changes or raw data loads
+  useEffect(() => {
+    if (!rawCAMData.length) return;
+
+    const towerStats: Record<string, { paid_flats: number; pending_flats: number; total_flats: number; count: number }> = {};
+    const towerMaxMonth: Record<string, number> = {};
+
+    let targetMonths: number[] = [];
+
+    // Determine target months based on filter
+    if (camFilterType === 'latest') {
+      // Logic handled inside loop per tower
+    } else if (camFilterType === 'month') {
+      if (camFilterValue !== 'all') targetMonths = [parseInt(camFilterValue)];
+    } else if (camFilterType === 'quarter') {
+      const q = CAM_QUARTERS.find(q => q.value === parseInt(camFilterValue));
+      if (q) targetMonths = q.months;
+    } else if (camFilterType === 'half_year') {
+      const hy = CAM_HALFYEARS.find(h => h.value === parseInt(camFilterValue));
+      if (hy) targetMonths = hy.months;
+    } else if (camFilterType === 'year') {
+      // All months
+      targetMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    rawCAMData.forEach(item => {
+      if (!item.tower || !item.month) return;
+
+      let include = false;
+
+      if (camFilterType === 'latest') {
+        if (!towerMaxMonth[item.tower] || item.month > towerMaxMonth[item.tower]) {
+          towerMaxMonth[item.tower] = item.month;
+          towerStats[item.tower] = {
+            paid_flats: item.paid_flats,
+            pending_flats: item.pending_flats,
+            total_flats: item.total_flats || 0,
+            count: 1
+          };
+        }
+        return;
+      } else {
+        if (targetMonths.includes(item.month)) {
+          include = true;
+        }
+      }
+
+      if (include) {
+        if (!towerStats[item.tower]) {
+          towerStats[item.tower] = { paid_flats: 0, pending_flats: 0, total_flats: 0, count: 0 };
+        }
+        towerStats[item.tower].paid_flats += item.paid_flats;
+        towerStats[item.tower].pending_flats += item.pending_flats;
+        towerStats[item.tower].total_flats += (item.total_flats || 0);
+        towerStats[item.tower].count += 1;
+      }
+    });
+
+    const processedData = Object.entries(towerStats)
+      .map(([tower, stats]) => {
+        const rate = stats.total_flats > 0 ? (stats.paid_flats / stats.total_flats * 100).toFixed(1) : 0;
+        return {
+          tower,
+          paid_flats: stats.paid_flats,
+          pending_flats: stats.pending_flats,
+          total_flats: stats.total_flats,
+          payment_rate: rate
+        };
+      })
+      .sort((a, b) => a.tower.localeCompare(b.tower, undefined, { numeric: true }));
+
+    setTowerCAMData(processedData);
+  }, [rawCAMData, camFilterType, camFilterValue]);
 
   useEffect(() => {
     loadDashboardData();
@@ -786,6 +863,69 @@ export default function Dashboard() {
           </div>
 
           <div className="w-full overflow-hidden">
+            {/* CAM Filtering Controls */}
+            <div className="flex flex-wrap items-center gap-4 mb-4 bg-background/50 p-2 rounded-lg border">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Filter by:</span>
+              </div>
+
+              <Select value={camFilterType} onValueChange={(val) => {
+                setCamFilterType(val);
+                setCamFilterValue(val === 'latest' || val === 'year' ? 'all' : '');
+              }}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Filter Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest">Latest Month</SelectItem>
+                  <SelectItem value="month">Specific Month</SelectItem>
+                  <SelectItem value="quarter">Quarterly</SelectItem>
+                  <SelectItem value="half_year">Half Yearly</SelectItem>
+                  <SelectItem value="year">Full Year</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {camFilterType === 'month' && (
+                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Select Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CAM_MONTHS.map(m => (
+                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {camFilterType === 'quarter' && (
+                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Select Quarter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CAM_QUARTERS.map(q => (
+                      <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {camFilterType === 'half_year' && (
+                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Select Half Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CAM_HALFYEARS.map(h => (
+                      <SelectItem key={h.value} value={String(h.value)}>{h.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             <TowerCAMChart data={towerCAMData} />
           </div>
         </TabsContent>
