@@ -97,22 +97,40 @@ export default function Dashboard() {
 
   const loadPettyCashData = async () => {
     try {
+      // Get current fiscal year dates (Apr 2024 - Mar 2025 for FY 2024-25)
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1; // 1-12
+      const currentYear = now.getFullYear();
+
+      // If current month is Jan-Mar, fiscal year started last year
+      // If current month is Apr-Dec, fiscal year started this year
+      const fiscalYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+      const fiscalYearEnd = fiscalYearStart + 1;
+
+      const startDate = `${fiscalYearStart}-04-01`;
+      const endDate = `${fiscalYearEnd}-03-31`;
+
+      console.log('Loading petty cash for fiscal year:', startDate, 'to', endDate);
+
       const { data, error } = await supabase
         .from('petty_cash')
         .select('amount, date, item_name')
         .eq('status', 'approved')
+        .gte('date', startDate)
+        .lte('date', endDate)
         .order('date');
 
       if (error) throw error;
 
       console.log('Petty Cash Data loaded:', data);
 
-      // Process monthly data
-      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
+      // Process monthly data for fiscal year (Apr-Mar)
+      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
       const monthlyMap: Record<string, number> = {};
 
       data?.forEach(item => {
-        const month = new Date(item.date).toLocaleString('en-US', { month: 'short' });
+        const itemDate = new Date(item.date);
+        const month = itemDate.toLocaleString('en-US', { month: 'short' });
         monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.amount);
       });
 
