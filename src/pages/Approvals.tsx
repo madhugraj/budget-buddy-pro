@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -755,6 +756,87 @@ export default function Approvals() {
     }
   };
 
+  const handleBulkApproveCAM = async () => {
+    if (selectedCAMIds.size === 0) return;
+
+    const confirmed = confirm(`Approve ${selectedCAMIds.size} CAM record(s)?`);
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const idsToApprove = Array.from(selectedCAMIds);
+
+      const { error } = await supabase
+        .from('cam_tracking')
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+          is_locked: true
+        })
+        .in('id', idsToApprove);
+
+      if (error) throw error;
+
+      toast({
+        title: 'CAM Records Approved',
+        description: `${idsToApprove.length} CAM record(s) have been successfully approved.`,
+      });
+
+      setSelectedCAMIds(new Set());
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error approving CAM records',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleBulkRejectCAM = async () => {
+    if (selectedCAMIds.size === 0) return;
+
+    const confirmed = confirm(`Reject ${selectedCAMIds.size} CAM record(s)? They will be sent back for correction.`);
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const idsToReject = Array.from(selectedCAMIds);
+
+      const { error } = await supabase
+        .from('cam_tracking')
+        .update({
+          status: 'correction_pending',
+          is_locked: false
+        })
+        .in('id', idsToReject);
+
+      if (error) throw error;
+
+      toast({
+        title: 'CAM Records Rejected',
+        description: `${idsToReject.length} CAM record(s) have been sent back for correction.`,
+      });
+
+      setSelectedCAMIds(new Set());
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error rejecting CAM records',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -794,8 +876,34 @@ export default function Approvals() {
         <TabsContent value="cam" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pending CAM Approvals</CardTitle>
-              <CardDescription>Review and approve CAM data submissions</CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Pending CAM Approvals</CardTitle>
+                  <CardDescription>Review and approve CAM data submissions</CardDescription>
+                </div>
+                {selectedCAMIds.size > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={handleBulkRejectCAM}
+                      disabled={processing}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject {selectedCAMIds.size}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleBulkApproveCAM}
+                      disabled={processing}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve {selectedCAMIds.size}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {pendingCAM.length === 0 ? (
@@ -804,52 +912,79 @@ export default function Approvals() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <Checkbox
+                      checked={selectedCAMIds.size === pendingCAM.length && pendingCAM.length > 0}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedCAMIds(new Set(pendingCAM.map(c => c.id)));
+                        } else {
+                          setSelectedCAMIds(new Set());
+                        }
+                      }}
+                    />
+                    <span className="text-sm font-medium">Select All ({pendingCAM.length})</span>
+                  </div>
                   {pendingCAM.map((cam) => (
                     <div
                       key={cam.id}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors gap-4"
+                      className="flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">Tower {cam.tower}</span>
-                          <Badge variant="outline">
-                            {cam.month ? getMonthName(cam.month) : `Q${cam.quarter}`} {cam.year}
-                          </Badge>
+                      <Checkbox
+                        checked={selectedCAMIds.has(cam.id)}
+                        onCheckedChange={(checked) => {
+                          const newSelected = new Set(selectedCAMIds);
+                          if (checked) {
+                            newSelected.add(cam.id);
+                          } else {
+                            newSelected.delete(cam.id);
+                          }
+                          setSelectedCAMIds(newSelected);
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">Tower {cam.tower}</span>
+                            <Badge variant="outline">
+                              {cam.month ? getMonthName(cam.month) : `Q${cam.quarter}`} {cam.year}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Submitted by {cam.profiles?.full_name || 'Unknown'} • {new Date(cam.submitted_at || '').toLocaleDateString()}
+                          </div>
+                          <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                            <span>Paid Flats: <span className="font-medium">{cam.paid_flats}</span></span>
+                            <span>Pending Flats: <span className="font-medium">{cam.pending_flats}</span></span>
+                            <span>Total Flats: <span className="font-medium">{cam.total_flats}</span></span>
+                            <span>Advance: <span className="font-medium">{cam.advance_payments}</span></span>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          Submitted by {cam.profiles?.full_name || 'Unknown'} • {new Date(cam.submitted_at || '').toLocaleDateString()}
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 sm:flex-none text-destructive hover:text-destructive"
+                            onClick={() => handleRejectCAM(cam.id)}
+                            disabled={processing}
+                          >
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 sm:flex-none"
+                            onClick={() => handleApproveCAM(cam.id)}
+                            disabled={processing}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve
+                          </Button>
                         </div>
-                        <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
-                          <span>Paid Flats: <span className="font-medium">{cam.paid_flats}</span></span>
-                          <span>Pending Flats: <span className="font-medium">{cam.pending_flats}</span></span>
-                          <span>Total Flats: <span className="font-medium">{cam.total_flats}</span></span>
-                          <span>Advance: <span className="font-medium">{cam.advance_payments}</span></span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 sm:flex-none text-destructive hover:text-destructive"
-                          onClick={() => handleRejectCAM(cam.id)}
-                          disabled={processing}
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Reject
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 sm:flex-none"
-                          onClick={() => handleApproveCAM(cam.id)}
-                          disabled={processing}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve
-                        </Button>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  ))}\n                </div>
               )}
             </CardContent>
           </Card>
