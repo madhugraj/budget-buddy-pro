@@ -6,22 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { Download, FileText, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const TOWERS = [
     'All', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
     '9A', '9B', '9C', '10', '11', '12', '13', '14', '15A', '15B',
     '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'
-];
-
-const MONTHS = [
-    { value: 'all', label: 'All Months' },
-    { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
-    { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
-    { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
-    { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' }
 ];
 
 const QUARTERS = [
@@ -32,61 +23,52 @@ const QUARTERS = [
     { value: 4, label: 'Q4 (Jan-Mar)' }
 ];
 
-interface CAMRecord {
+interface CAMDocument {
     id: string;
     tower: string;
-    month: number;
-    year: number;
     quarter: number;
-    paid_flats: number;
-    pending_flats: number;
-    total_flats: number;
-    dues_cleared_from_previous: number;
-    advance_payments: number;
+    year: number;
+    document_url: string | null;
     status: string;
     submitted_at: string | null;
     approved_at: string | null;
-    notes: string | null;
 }
 
 export default function CAMReports() {
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
-    const [records, setRecords] = useState<CAMRecord[]>([]);
+    const [documents, setDocuments] = useState<CAMDocument[]>([]);
     const [selectedTower, setSelectedTower] = useState('All');
-    const [selectedMonth, setSelectedMonth] = useState<string | number>('all');
     const [selectedQuarter, setSelectedQuarter] = useState<string | number>('all');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [viewMode, setViewMode] = useState<'month' | 'quarter'>('month');
 
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
     useEffect(() => {
         if (userRole === 'treasurer') {
-            loadRecords();
+            loadDocuments();
         }
-    }, [selectedTower, selectedMonth, selectedQuarter, selectedYear, viewMode, userRole]);
+    }, [selectedTower, selectedQuarter, selectedYear, userRole]);
 
-    const loadRecords = async () => {
+    const loadDocuments = async () => {
         setLoading(true);
         try {
             let query = supabase
                 .from('cam_tracking')
-                .select('*')
+                .select('id, tower, quarter, year, document_url, status, submitted_at, approved_at')
                 .eq('year', selectedYear)
                 .in('status', ['submitted', 'approved'])
+                .not('document_url', 'is', null)
                 .order('tower')
-                .order('month');
+                .order('quarter');
 
             // Tower filter
             if (selectedTower !== 'All') {
                 query = query.eq('tower', selectedTower);
             }
 
-            // Month/Quarter filter
-            if (viewMode === 'month' && selectedMonth !== 'all') {
-                query = query.eq('month', selectedMonth);
-            } else if (viewMode === 'quarter' && selectedQuarter !== 'all') {
+            // Quarter filter
+            if (selectedQuarter !== 'all') {
                 query = query.eq('quarter', selectedQuarter);
             }
 
@@ -94,53 +76,36 @@ export default function CAMReports() {
 
             if (error) throw error;
 
-            setRecords(data || []);
+            // Group by tower and quarter to get unique documents
+            const uniqueDocs = new Map<string, CAMDocument>();
+            data?.forEach(record => {
+                const key = `${record.tower}-${record.quarter}-${record.year}`;
+                if (!uniqueDocs.has(key) && record.document_url) {
+                    uniqueDocs.set(key, record as CAMDocument);
+                }
+            });
+
+            setDocuments(Array.from(uniqueDocs.values()));
         } catch (error: any) {
-            toast.error('Failed to load records: ' + error.message);
+            toast.error('Failed to load documents: ' + error.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const getMonthName = (month: number) => {
-        return MONTHS.find(m => m.value === month)?.label || month.toString();
+    const getQuarterLabel = (quarter: number) => {
+        return QUARTERS.find(q => q.value === quarter)?.label || `Q${quarter}`;
     };
 
-    const downloadExcel = () => {
-        if (records.length === 0) {
-            toast.error('No records to download');
-            return;
-        }
-
-        const exportData = records.map(record => ({
-            'Tower': record.tower,
-            'Month': getMonthName(record.month),
-            'Quarter': `Q${record.quarter}`,
-            'Year': record.year,
-            'Paid Flats': record.paid_flats,
-            'Pending Flats': record.pending_flats,
-            'Total Flats': record.total_flats,
-            'Payment Rate %': record.total_flats > 0 ? ((record.paid_flats / record.total_flats) * 100).toFixed(1) : '0',
-            'Dues Cleared': record.dues_cleared_from_previous,
-            'Advance Payments': record.advance_payments,
-            'Status': record.status,
-            'Submitted At': record.submitted_at ? new Date(record.submitted_at).toLocaleDateString() : '-',
-            'Approved At': record.approved_at ? new Date(record.approved_at).toLocaleDateString() : '-',
-            'Notes': record.notes || '-'
-        }));
-
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'CAM Records');
-
-        // Auto-size columns
-        const maxWidth = exportData.reduce((w, r) => Math.max(w, ...Object.values(r).map(val => String(val).length)), 10);
-        worksheet['!cols'] = Object.keys(exportData[0] || {}).map(() => ({ wch: Math.min(maxWidth, 30) }));
-
-        const fileName = `CAM_Records_${selectedTower}_${selectedYear}_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, fileName);
-
-        toast.success('Report downloaded successfully');
+    const downloadDocument = (url: string, tower: string, quarter: number, year: number) => {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `CAM_${tower}_Q${quarter}_${year}.pdf`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Document download started');
     };
 
     if (userRole !== 'treasurer') {
@@ -161,23 +126,23 @@ export default function CAMReports() {
         <div className="container mx-auto p-6 space-y-6">
             <div>
                 <h1 className="text-3xl font-bold flex items-center gap-2">
-                    <FileSpreadsheet className="h-8 w-8" />
-                    CAM Records & Reports
+                    <FileText className="h-8 w-8" />
+                    CAM Supporting Documents
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                    Download tower-wise CAM collection reports for MC follow-up
+                    View and download quarterly CAM supporting documents uploaded by Lead users
                 </p>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Filter & Download</CardTitle>
+                    <CardTitle>Filter Documents</CardTitle>
                     <CardDescription>
-                        Select filters to view and download CAM records
+                        Select filters to view and download CAM supporting documents
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Tower</label>
                             <Select value={selectedTower} onValueChange={setSelectedTower}>
@@ -207,73 +172,43 @@ export default function CAMReports() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">View By</label>
-                            <Select value={viewMode} onValueChange={(val: 'month' | 'quarter') => setViewMode(val)}>
+                            <label className="text-sm font-medium">Quarter</label>
+                            <Select value={selectedQuarter.toString()} onValueChange={(val) => setSelectedQuarter(val === 'all' ? 'all' : parseInt(val))}>
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="month">Monthly</SelectItem>
-                                    <SelectItem value="quarter">Quarterly</SelectItem>
+                                    {QUARTERS.map(quarter => (
+                                        <SelectItem key={quarter.value} value={quarter.value.toString()}>{quarter.label}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
-
-                        {viewMode === 'month' ? (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Month</label>
-                                <Select value={selectedMonth.toString()} onValueChange={(val) => setSelectedMonth(val === 'all' ? 'all' : parseInt(val))}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {MONTHS.map(month => (
-                                            <SelectItem key={month.value} value={month.value.toString()}>{month.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Quarter</label>
-                                <Select value={selectedQuarter.toString()} onValueChange={(val) => setSelectedQuarter(val === 'all' ? 'all' : parseInt(val))}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {QUARTERS.map(quarter => (
-                                            <SelectItem key={quarter.value} value={quarter.value.toString()}>{quarter.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
                     </div>
 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-sm text-muted-foreground">
-                            {records.length} record(s) found
+                            {documents.length} document(s) found
                         </div>
-                        <Button onClick={downloadExcel} disabled={records.length === 0}>
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Excel
-                        </Button>
                     </div>
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Records Preview</CardTitle>
+                    <CardTitle>Documents</CardTitle>
+                    <CardDescription>
+                        Supporting documents uploaded by Lead users for CAM tracking
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
                         <div className="flex justify-center py-8">
                             <Loader2 className="h-8 w-8 animate-spin" />
                         </div>
-                    ) : records.length === 0 ? (
+                    ) : documents.length === 0 ? (
                         <p className="text-center py-8 text-muted-foreground">
-                            No records found for the selected filters
+                            No documents found for the selected filters
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
@@ -281,38 +216,52 @@ export default function CAMReports() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Tower</TableHead>
-                                        <TableHead>Month</TableHead>
                                         <TableHead>Quarter</TableHead>
-                                        <TableHead className="text-right">Paid</TableHead>
-                                        <TableHead className="text-right">Pending</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                        <TableHead className="text-right">Rate %</TableHead>
+                                        <TableHead>Year</TableHead>
                                         <TableHead>Status</TableHead>
+                                        <TableHead>Submitted</TableHead>
+                                        <TableHead>Approved</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {records.map((record) => {
-                                        const paymentRate = record.total_flats > 0
-                                            ? ((record.paid_flats / record.total_flats) * 100).toFixed(1)
-                                            : '0';
-
-                                        return (
-                                            <TableRow key={record.id}>
-                                                <TableCell className="font-medium">{record.tower}</TableCell>
-                                                <TableCell>{getMonthName(record.month)}</TableCell>
-                                                <TableCell>Q{record.quarter}</TableCell>
-                                                <TableCell className="text-right text-green-600">{record.paid_flats}</TableCell>
-                                                <TableCell className="text-right text-red-600">{record.pending_flats}</TableCell>
-                                                <TableCell className="text-right">{record.total_flats}</TableCell>
-                                                <TableCell className="text-right font-medium">{paymentRate}%</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={record.status === 'approved' ? 'default' : 'secondary'}>
-                                                        {record.status}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
+                                    {documents.map((doc) => (
+                                        <TableRow key={doc.id}>
+                                            <TableCell className="font-medium">{doc.tower}</TableCell>
+                                            <TableCell>{getQuarterLabel(doc.quarter)}</TableCell>
+                                            <TableCell>{doc.year}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
+                                                    {doc.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {doc.submitted_at ? new Date(doc.submitted_at).toLocaleDateString() : '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {doc.approved_at ? new Date(doc.approved_at).toLocaleDateString() : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => window.open(doc.document_url!, '_blank')}
+                                                    >
+                                                        <ExternalLink className="w-4 h-4 mr-1" />
+                                                        View
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.quarter, doc.year)}
+                                                    >
+                                                        <Download className="w-4 h-4 mr-1" />
+                                                        Download
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
                                 </TableBody>
                             </Table>
                         </div>

@@ -333,7 +333,8 @@ export default function CAMTracking() {
           dues_cleared_from_previous: data.dues_cleared_from_previous || 0,
           advance_payments: data.advance_payments || 0,
           notes: data.notes || null,
-          uploaded_by: user.id
+          uploaded_by: user.id,
+          document_url: supportingDocs[tower] || null
         };
       });
 
