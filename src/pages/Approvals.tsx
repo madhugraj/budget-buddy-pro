@@ -229,13 +229,20 @@ export default function Approvals() {
       if (correctionsError) throw correctionsError;
 
       // Fetch pending CAM data
+      console.log('=== LOADING CAM APPROVALS ===');
       const { data: pendingCAMData, error: camError } = await supabase
         .from('cam_tracking')
         .select('*')
         .eq('status', 'submitted')
         .order('submitted_at', { ascending: false });
 
-      if (camError) throw camError;
+      if (camError) {
+        console.error('CAM Error:', camError);
+        throw camError;
+      }
+
+      console.log('Pending CAM Data:', pendingCAMData);
+      console.log('Pending CAM Count:', pendingCAMData?.length || 0);
 
       // Fetch profiles for CAM data
       const camWithProfiles = await Promise.all(
@@ -248,6 +255,9 @@ export default function Approvals() {
           return { ...cam, profiles: profile || { full_name: 'Unknown', email: '' } };
         })
       );
+
+      console.log('CAM with Profiles:', camWithProfiles);
+      console.log('=== END CAM APPROVALS ===');
 
       setPendingExpenses(pending || []);
       setPendingIncome(incomeWithProfiles as Income[] || []);
