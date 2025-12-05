@@ -23,11 +23,28 @@ const QUARTERS = [
     { value: 4, label: 'Q4 (Jan-Mar)' }
 ];
 
+const MONTHS = [
+    { value: 'all', label: 'All Months' },
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
+    { value: 8, label: 'August' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'October' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'December' }
+];
+
 interface CAMDocument {
     id: string;
     tower: string;
     quarter: number;
     year: number;
+    month: number;
     document_url: string | null;
     status: string;
     submitted_at: string | null;
@@ -40,6 +57,7 @@ export default function CAMReports() {
     const [documents, setDocuments] = useState<CAMDocument[]>([]);
     const [selectedTower, setSelectedTower] = useState('All');
     const [selectedQuarter, setSelectedQuarter] = useState<string | number>('all');
+    const [selectedMonth, setSelectedMonth] = useState<string | number>('all');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
@@ -48,14 +66,14 @@ export default function CAMReports() {
         if (userRole === 'treasurer') {
             loadDocuments();
         }
-    }, [selectedTower, selectedQuarter, selectedYear, userRole]);
+    }, [selectedTower, selectedQuarter, selectedMonth, selectedYear, userRole]);
 
     const loadDocuments = async () => {
         setLoading(true);
         try {
             let query = supabase
                 .from('cam_tracking')
-                .select('id, tower, quarter, year, document_url, status, submitted_at, approved_at')
+                .select('id, tower, quarter, year, month, document_url, status, submitted_at, approved_at')
                 .eq('year', selectedYear)
                 .in('status', ['submitted', 'approved'])
                 .not('document_url', 'is', null)
@@ -72,14 +90,27 @@ export default function CAMReports() {
                 query = query.eq('quarter', selectedQuarter);
             }
 
+            // Month filter
+            if (selectedMonth !== 'all') {
+                query = query.eq('month', selectedMonth);
+            }
+
             const { data, error } = await query;
 
             if (error) throw error;
 
-            // Group by tower and quarter to get unique documents
+            // Group by tower and quarter to get unique documents, UNLESS a specific month is selected
+            // If a specific month is selected, we show that specific record
             const uniqueDocs = new Map<string, CAMDocument>();
+
             data?.forEach(record => {
-                const key = `${record.tower}-${record.quarter}-${record.year}`;
+                // If filtering by month, we want to show that specific month's record
+                // If filtering by quarter/all, we want to show one per quarter (since usually it's one doc per quarter)
+                const isMonthView = selectedMonth !== 'all';
+                const key = isMonthView
+                    ? `${record.tower}-${record.month}-${record.year}` // Unique per month
+                    : `${record.tower}-${record.quarter}-${record.year}`; // Unique per quarter
+
                 if (!uniqueDocs.has(key) && record.document_url) {
                     uniqueDocs.set(key, record as CAMDocument);
                 }
@@ -97,10 +128,15 @@ export default function CAMReports() {
         return QUARTERS.find(q => q.value === quarter)?.label || `Q${quarter}`;
     };
 
-    const downloadDocument = (url: string, tower: string, quarter: number, year: number) => {
+    const getMonthLabel = (month: number) => {
+        return MONTHS.find(m => m.value === month)?.label || `M${month}`;
+    };
+
+    const downloadDocument = (url: string, tower: string, quarter: number, month: number, year: number) => {
         const link = document.createElement('a');
         link.href = url;
-        link.download = `CAM_${tower}_Q${quarter}_${year}.pdf`;
+        const period = selectedMonth !== 'all' ? getMonthLabel(month) : `Q${quarter}`;
+        link.download = `CAM_${tower}_${period}_${year}.pdf`;
         link.target = '_blank';
         document.body.appendChild(link);
         link.click();
@@ -130,7 +166,7 @@ export default function CAMReports() {
                     CAM Supporting Documents
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                    View and download quarterly CAM supporting documents uploaded by Lead users
+                    View and download quarterly/monthly CAM supporting documents uploaded by Lead users
                 </p>
             </div>
 
@@ -142,7 +178,7 @@ export default function CAMReports() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Tower</label>
                             <Select value={selectedTower} onValueChange={setSelectedTower}>
@@ -173,7 +209,13 @@ export default function CAMReports() {
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Quarter</label>
-                            <Select value={selectedQuarter.toString()} onValueChange={(val) => setSelectedQuarter(val === 'all' ? 'all' : parseInt(val))}>
+                            <Select
+                                value={selectedQuarter.toString()}
+                                onValueChange={(val) => {
+                                    setSelectedQuarter(val === 'all' ? 'all' : parseInt(val));
+                                    if (val !== 'all') setSelectedMonth('all'); // Reset month if quarter changes
+                                }}
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -184,12 +226,45 @@ export default function CAMReports() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Month</label>
+                            <Select
+                                value={selectedMonth.toString()}
+                                onValueChange={(val) => {
+                                    setSelectedMonth(val === 'all' ? 'all' : parseInt(val));
+                                    if (val !== 'all' && selectedQuarter !== 'all') {
+                                        // Optional: Check if month matches quarter, but for now allow flexibility
+                                    }
+                                }}
+                                disabled={false}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MONTHS.map(month => (
+                                        <SelectItem key={month.value} value={month.value.toString()}>{month.label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-sm text-muted-foreground">
                             {documents.length} document(s) found
                         </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedTower('All');
+                                setSelectedQuarter('all');
+                                setSelectedMonth('all');
+                            }}
+                        >
+                            Reset Filters
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -217,6 +292,7 @@ export default function CAMReports() {
                                     <TableRow>
                                         <TableHead>Tower</TableHead>
                                         <TableHead>Quarter</TableHead>
+                                        {selectedMonth !== 'all' && <TableHead>Month</TableHead>}
                                         <TableHead>Year</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Submitted</TableHead>
@@ -229,6 +305,7 @@ export default function CAMReports() {
                                         <TableRow key={doc.id}>
                                             <TableCell className="font-medium">{doc.tower}</TableCell>
                                             <TableCell>{getQuarterLabel(doc.quarter)}</TableCell>
+                                            {selectedMonth !== 'all' && <TableCell>{getMonthLabel(doc.month)}</TableCell>}
                                             <TableCell>{doc.year}</TableCell>
                                             <TableCell>
                                                 <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
@@ -253,7 +330,7 @@ export default function CAMReports() {
                                                     </Button>
                                                     <Button
                                                         size="sm"
-                                                        onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.quarter, doc.year)}
+                                                        onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.quarter, doc.month, doc.year)}
                                                     >
                                                         <Download className="w-4 h-4 mr-1" />
                                                         Download
