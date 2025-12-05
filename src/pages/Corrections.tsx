@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -761,7 +762,9 @@ export default function Corrections() {
     }
   };
 
-  const handleDeleteClick = (id: string, type: 'expense' | 'income' | 'petty_cash', description: string) => {
+  const navigate = useNavigate();
+
+  const handleDeleteClick = (id: string, type: 'expense' | 'income' | 'petty_cash' | 'cam', description: string) => {
     setDeleteConfirmation({
       isOpen: true,
       id,
@@ -779,7 +782,9 @@ export default function Corrections() {
         ? 'expenses'
         : deleteConfirmation.type === 'income'
           ? 'income_actuals'
-          : 'petty_cash';
+          : deleteConfirmation.type === 'petty_cash'
+            ? 'petty_cash'
+            : 'cam_tracking';
 
       const { error } = await supabase
         .from(table)
@@ -799,8 +804,10 @@ export default function Corrections() {
         await loadHistoricalExpenses();
       } else if (deleteConfirmation.type === 'income') {
         await loadHistoricalIncome();
-      } else {
+      } else if (deleteConfirmation.type === 'petty_cash') {
         await loadHistoricalPettyCash();
+      } else {
+        await loadHistoricalCAM();
       }
     } catch (error: any) {
       toast({
@@ -1426,6 +1433,9 @@ export default function Corrections() {
                             <TableHead className="text-right">Pending Flats</TableHead>
                             <TableHead className="text-right">Total Flats</TableHead>
                             <TableHead>Status</TableHead>
+                            {userRole === 'treasurer' && (
+                              <TableHead className="text-center">Actions</TableHead>
+                            )}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1441,6 +1451,31 @@ export default function Corrections() {
                               <TableCell>
                                 <Badge variant="secondary">{cam.status}</Badge>
                               </TableCell>
+                              {userRole === 'treasurer' && (
+                                <TableCell className="text-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      // Navigate to CAM Tracking page with this record
+                                      navigate('/cam-tracking');
+                                      toast.info('Please edit CAM data in the CAM Tracking page');
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeleteClick(cam.id, 'cam', `Tower ${cam.tower}`)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </TableCell>
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
