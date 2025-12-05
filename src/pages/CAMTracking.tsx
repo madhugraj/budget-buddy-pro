@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, Save, Upload, Building2, AlertCircle, Download, Send } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
 
 const TOWERS = [
@@ -19,13 +20,13 @@ const TOWERS = [
   '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'
 ];
 
-// Tower-specific total flats: 67 per tower, except 11, 12, 13 which have 201 each
+// Tower-specific total flats: 67 per tower, except 11 (57), 12, 13, 14 (201 each)
 const TOWER_TOTAL_FLATS: Record<string, number> = {
   '1A': 67, '1B': 67, '2A': 67, '2B': 67, '3A': 67, '3B': 67,
   '4A': 67, '4B': 67, '5': 67, '6': 67, '7': 67, '8': 67,
   '9A': 67, '9B': 67, '9C': 67, '10': 67,
-  '11': 201, '12': 201, '13': 201,
-  '14': 67, '15A': 67, '15B': 67,
+  '11': 57, '12': 201, '13': 201, '14': 201,
+  '15A': 67, '15B': 67,
   '16A': 67, '16B': 67, '17A': 67, '17B': 67,
   '18A': 67, '18B': 67, '18C': 67, '19': 67,
   '20A': 67, '20B': 67, '20C': 67
@@ -93,6 +94,9 @@ export default function CAMTracking() {
   const [supportingDocs, setSupportingDocs] = useState<Record<string, string>>({});
   const [userRole, setUserRole] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [draftRecords, setDraftRecords] = useState<CAMDataFromDB[]>([]);
+  const [selectedDrafts, setSelectedDrafts] = useState<Set<string>>(new Set());
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
 
   const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
 
@@ -102,7 +106,10 @@ export default function CAMTracking() {
 
   useEffect(() => {
     fetchCAMData();
-  }, [selectedYear, selectedQuarter]);
+    if (userRole === 'lead') {
+      loadDraftRecords();
+    }
+  }, [selectedYear, selectedQuarter, userRole]);
 
   const fetchUserRole = async () => {
     if (!user) return;
@@ -184,6 +191,63 @@ export default function CAMTracking() {
       toast.error('Failed to fetch CAM data: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDraftRecords = async () => {
+    if (!user) return;
+    setLoadingDrafts(true);
+    try {
+      const { calendarYear } = getCalendarYearAndMonths();
+
+      const { data, error } = await supabase
+        .from('cam_tracking')
+        .select('*')
+        .eq('year', calendarYear)
+        .eq('status', 'draft')
+        .eq('uploaded_by', user.id)
+        .order('tower')
+        .order('month');
+
+      if (error) throw error;
+
+      setDraftRecords((data || []) as CAMDataFromDB[]);
+    } catch (error: any) {
+      toast.error('Failed to load draft records: ' + error.message);
+    } finally {
+      setLoadingDrafts(false);
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    if (!user || selectedDrafts.size === 0) return;
+
+    const confirmed = confirm(`Submit ${selectedDrafts.size} draft record(s) for approval?`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      const idsToSubmit = Array.from(selectedDrafts);
+
+      const { error } = await supabase
+        .from('cam_tracking')
+        .update({
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+          uploaded_by: user.id
+        } as any)
+        .in('id', idsToSubmit);
+
+      if (error) throw error;
+
+      toast.success(`${idsToSubmit.length} record(s) submitted for approval`);
+      setSelectedDrafts(new Set());
+      loadDraftRecords();
+      fetchCAMData();
+    } catch (error: any) {
+      toast.error('Failed to submit records: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -502,6 +566,9 @@ export default function CAMTracking() {
           <TabsTrigger value="tower-entry">Tower-wise Entry</TabsTrigger>
           <TabsTrigger value="overview">All Towers Overview</TabsTrigger>
           <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
+          {userRole === 'lead' && (
+            <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="tower-entry" className="space-y-4">
@@ -761,6 +828,97 @@ export default function CAMTracking() {
         <TabsContent value="summary">
           <QuarterlySummary />
         </TabsContent>
+
+        {userRole === 'lead' && (
+          <TabsContent value="drafts">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Draft CAM Records</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select records to submit for approval
+                    </p>
+                  </div>
+                  {selectedDrafts.size > 0 && (
+                    <Button onClick={handleBulkSubmit} disabled={saving}>
+                      <Send className="w-4 h-4 mr-2" />
+                      Submit {selectedDrafts.size} Record{selectedDrafts.size > 1 ? 's' : ''}
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingDrafts ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : draftRecords.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    No draft records found. All data has been submitted.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox
+                              checked={selectedDrafts.size === draftRecords.length && draftRecords.length > 0}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedDrafts(new Set(draftRecords.map(r => r.id)));
+                                } else {
+                                  setSelectedDrafts(new Set());
+                                }
+                              }}
+                            />
+                          </TableHead>
+                          <TableHead>Tower</TableHead>
+                          <TableHead>Month</TableHead>
+                          <TableHead className="text-right">Paid Flats</TableHead>
+                          <TableHead className="text-right">Pending Flats</TableHead>
+                          <TableHead className="text-right">Total Flats</TableHead>
+                          <TableHead className="text-right">Dues Cleared</TableHead>
+                          <TableHead className="text-right">Advance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {draftRecords.map((record) => (
+                          <TableRow key={record.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedDrafts.has(record.id)}
+                                onCheckedChange={(checked) => {
+                                  const newSelected = new Set(selectedDrafts);
+                                  if (checked) {
+                                    newSelected.add(record.id);
+                                  } else {
+                                    newSelected.delete(record.id);
+                                  }
+                                  setSelectedDrafts(newSelected);
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{record.tower}</TableCell>
+                            <TableCell>
+                              {MONTH_NAMES[record.month || 0] || record.month}
+                            </TableCell>
+                            <TableCell className="text-right">{record.paid_flats}</TableCell>
+                            <TableCell className="text-right">{record.pending_flats}</TableCell>
+                            <TableCell className="text-right">{record.total_flats}</TableCell>
+                            <TableCell className="text-right">{record.dues_cleared_from_previous}</TableCell>
+                            <TableCell className="text-right">{record.advance_payments}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
