@@ -142,6 +142,7 @@ export type Database = {
           correction_reason: string | null
           correction_requested_at: string | null
           created_at: string
+          document_url: string | null
           dues_cleared_from_previous: number
           id: string
           is_locked: boolean
@@ -166,6 +167,7 @@ export type Database = {
           correction_reason?: string | null
           correction_requested_at?: string | null
           created_at?: string
+          document_url?: string | null
           dues_cleared_from_previous?: number
           id?: string
           is_locked?: boolean
@@ -190,6 +192,7 @@ export type Database = {
           correction_reason?: string | null
           correction_requested_at?: string | null
           created_at?: string
+          document_url?: string | null
           dues_cleared_from_previous?: number
           id?: string
           is_locked?: boolean
@@ -576,6 +579,119 @@ export type Database = {
         }
         Relationships: []
       }
+      sports_income: {
+        Row: {
+          amount_received: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          fiscal_year: string
+          gst_amount: number
+          id: string
+          month: number
+          notes: string | null
+          sport_id: string
+          status: string
+          submitted_by: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          amount_received?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          fiscal_year: string
+          gst_amount?: number
+          id?: string
+          month: number
+          notes?: string | null
+          sport_id: string
+          status?: string
+          submitted_by: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_received?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          fiscal_year?: string
+          gst_amount?: number
+          id?: string
+          month?: number
+          notes?: string | null
+          sport_id?: string
+          status?: string
+          submitted_by?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sports_income_sport_id_fkey"
+            columns: ["sport_id"]
+            isOneToOne: false
+            referencedRelation: "sports_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sports_master: {
+        Row: {
+          agreement_url: string | null
+          base_fare: number
+          coach_trainer_academy: string
+          created_at: string
+          created_by: string
+          duration: string
+          gst_amount: number
+          id: string
+          is_active: boolean
+          location: string
+          num_students: number
+          sport_name: string
+          total_amount: number
+          training_days: string[]
+          updated_at: string
+        }
+        Insert: {
+          agreement_url?: string | null
+          base_fare?: number
+          coach_trainer_academy: string
+          created_at?: string
+          created_by: string
+          duration: string
+          gst_amount?: number
+          id?: string
+          is_active?: boolean
+          location: string
+          num_students?: number
+          sport_name: string
+          total_amount?: number
+          training_days?: string[]
+          updated_at?: string
+        }
+        Update: {
+          agreement_url?: string | null
+          base_fare?: number
+          coach_trainer_academy?: string
+          created_at?: string
+          created_by?: string
+          duration?: string
+          gst_amount?: number
+          id?: string
+          is_active?: boolean
+          location?: string
+          num_students?: number
+          sport_name?: string
+          total_amount?: number
+          training_days?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -619,7 +735,7 @@ export type Database = {
       }
     }
     Enums: {
-      user_role: "treasurer" | "accountant" | "lead"
+      user_role: "treasurer" | "accountant" | "lead" | "office_assistant"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -747,7 +863,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      user_role: ["treasurer", "accountant", "lead"],
+      user_role: ["treasurer", "accountant", "lead", "office_assistant"],
     },
   },
 } as const

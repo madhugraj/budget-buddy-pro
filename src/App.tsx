@@ -20,6 +20,7 @@ import Reports from "./pages/Reports";
 import PettyCash from "./pages/PettyCash";
 import CAMTracking from "./pages/CAMTracking";
 import MissingDataReport from "./pages/MissingDataReport";
+import SportsIncome from "./pages/SportsIncome";
 import CAMReports from "./pages/CAMReports";
 import NotFound from "./pages/NotFound";
 
@@ -171,9 +172,19 @@ const App = () => (
               }
             />
             <Route
+              path="/sports-income"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <SportsIncome />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/cam-reports"
               element={
-                <ProtectedRoute requiredRole="treasurer">
+                <ProtectedRoute>
                   <AppLayout>
                     <CAMReports />
                   </AppLayout>
