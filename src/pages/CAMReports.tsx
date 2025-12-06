@@ -44,11 +44,11 @@ interface CAMDocument {
     tower: string;
     quarter: number;
     year: number;
-    month: number;
-    document_url: string | null;
+    month: number | null;
     status: string;
     submitted_at: string | null;
     approved_at: string | null;
+    notes: string | null;
 }
 
 export default function CAMReports() {
@@ -73,10 +73,9 @@ export default function CAMReports() {
         try {
             let query = supabase
                 .from('cam_tracking')
-                .select('id, tower, quarter, year, month, document_url, status, submitted_at, approved_at')
+                .select('id, tower, quarter, year, month, status, submitted_at, approved_at, notes')
                 .eq('year', selectedYear)
                 .in('status', ['submitted', 'approved'])
-                .not('document_url', 'is', null)
                 .order('tower')
                 .order('quarter');
 
@@ -87,38 +86,35 @@ export default function CAMReports() {
 
             // Quarter filter
             if (selectedQuarter !== 'all') {
-                query = query.eq('quarter', selectedQuarter);
+                query = query.eq('quarter', Number(selectedQuarter));
             }
 
             // Month filter
             if (selectedMonth !== 'all') {
-                query = query.eq('month', selectedMonth);
+                query = query.eq('month', Number(selectedMonth));
             }
 
             const { data, error } = await query;
 
             if (error) throw error;
 
-            // Group by tower and quarter to get unique documents, UNLESS a specific month is selected
-            // If a specific month is selected, we show that specific record
+            // Group by tower and quarter to get unique records
             const uniqueDocs = new Map<string, CAMDocument>();
 
             data?.forEach(record => {
-                // If filtering by month, we want to show that specific month's record
-                // If filtering by quarter/all, we want to show one per quarter (since usually it's one doc per quarter)
                 const isMonthView = selectedMonth !== 'all';
                 const key = isMonthView
-                    ? `${record.tower}-${record.month}-${record.year}` // Unique per month
-                    : `${record.tower}-${record.quarter}-${record.year}`; // Unique per quarter
+                    ? `${record.tower}-${record.month}-${record.year}`
+                    : `${record.tower}-${record.quarter}-${record.year}`;
 
-                if (!uniqueDocs.has(key) && record.document_url) {
+                if (!uniqueDocs.has(key)) {
                     uniqueDocs.set(key, record as CAMDocument);
                 }
             });
 
             setDocuments(Array.from(uniqueDocs.values()));
         } catch (error: any) {
-            toast.error('Failed to load documents: ' + error.message);
+            toast.error('Failed to load CAM records: ' + error.message);
         } finally {
             setLoading(false);
         }
@@ -128,20 +124,9 @@ export default function CAMReports() {
         return QUARTERS.find(q => q.value === quarter)?.label || `Q${quarter}`;
     };
 
-    const getMonthLabel = (month: number) => {
+    const getMonthLabel = (month: number | null) => {
+        if (month === null) return '-';
         return MONTHS.find(m => m.value === month)?.label || `M${month}`;
-    };
-
-    const downloadDocument = (url: string, tower: string, quarter: number, month: number, year: number) => {
-        const link = document.createElement('a');
-        link.href = url;
-        const period = selectedMonth !== 'all' ? getMonthLabel(month) : `Q${quarter}`;
-        link.download = `CAM_${tower}_${period}_${year}.pdf`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Document download started');
     };
 
     if (userRole !== 'treasurer') {
@@ -297,7 +282,7 @@ export default function CAMReports() {
                                         <TableHead>Status</TableHead>
                                         <TableHead>Submitted</TableHead>
                                         <TableHead>Approved</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">Notes</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -319,23 +304,9 @@ export default function CAMReports() {
                                                 {doc.approved_at ? new Date(doc.approved_at).toLocaleDateString() : '-'}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => window.open(doc.document_url!, '_blank')}
-                                                    >
-                                                        <ExternalLink className="w-4 h-4 mr-1" />
-                                                        View
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.quarter, doc.month, doc.year)}
-                                                    >
-                                                        <Download className="w-4 h-4 mr-1" />
-                                                        Download
-                                                    </Button>
-                                                </div>
+                                                <Badge variant="outline" className="text-xs">
+                                                    {doc.notes ? 'Has Notes' : 'No Notes'}
+                                                </Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))}
