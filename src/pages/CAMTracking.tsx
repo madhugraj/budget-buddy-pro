@@ -61,6 +61,7 @@ interface CAMData {
   notes?: string;
   is_locked?: boolean;
   status?: string;
+  document_url?: string | null;
 }
 
 interface CAMDataFromDB {
@@ -78,8 +79,8 @@ interface CAMDataFromDB {
   is_locked: boolean;
   status: string;
   uploaded_by: string;
-  created_at: string;
   updated_at: string;
+  document_url?: string | null;
 }
 
 export default function CAMTracking() {
@@ -168,7 +169,8 @@ export default function CAMTracking() {
             advance_payments: existing.advance_payments,
             notes: existing.notes || undefined,
             is_locked: existing.is_locked,
-            status: existing.status
+            status: existing.status,
+            document_url: existing.document_url
           } : {
             tower,
             year: calendarYear,
@@ -184,6 +186,15 @@ export default function CAMTracking() {
           };
         });
       });
+
+      // Populate supportingDocs from fetched data
+      const docsMap: Record<string, string> = {};
+      typedData.forEach(d => {
+        if (d.tower && d.document_url) {
+          docsMap[d.tower] = d.document_url;
+        }
+      });
+      setSupportingDocs(docsMap);
 
       setCamData(dataMap);
       setValidationErrors({});
@@ -334,7 +345,8 @@ export default function CAMTracking() {
           advance_payments: data.advance_payments || 0,
           notes: data.notes || null,
           uploaded_by: user.id,
-          document_url: supportingDocs[tower] || null
+          // Use newly uploaded doc OR existing one from data if looking at same month/tower
+          document_url: supportingDocs[tower] || data.document_url || null
         };
       });
 
@@ -691,6 +703,21 @@ export default function CAMTracking() {
                       Upload
                     </Button>
                   </div>
+
+                  {supportingDocs[selectedTower] && (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={supportingDocs[selectedTower]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center"
+                      >
+                        <Download className="h-3 w-3 mr-1" />
+                        View Document
+                      </a>
+                    </div>
+                  )}
+
                   <Button
                     onClick={() => handleSaveTower(selectedTower)}
                     disabled={saving || !!validationErrors[selectedTower] || !canEditTower(selectedTower)}
