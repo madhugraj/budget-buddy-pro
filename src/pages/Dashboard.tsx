@@ -63,6 +63,7 @@ interface PettyCashItemData {
 interface MonthlyCAMData {
   month: string;
   paid_flats: number;
+  pending_flats: number;
 }
 
 interface TowerCAMData {
