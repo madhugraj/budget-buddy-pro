@@ -511,26 +511,22 @@ export default function CAMTracking() {
     }
 
     try {
-      // Upload file to Supabase storage as supporting document
+      // Upload file to 'cam' bucket (private bucket for security)
       const fileExt = file.name.split('.').pop();
-      const fileName = `${tower}_${Date.now()}.${fileExt}`;
-      const filePath = `cam-documents/${fileName}`;
+      const { calendarYear, months } = getCalendarYearAndMonths();
+      const fileName = `${tower}/${calendarYear}/Q${selectedQuarter}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('invoices')
-        .upload(filePath, file);
+        .from('cam')
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(filePath);
-
-      // Store the file URL for this tower (you can save this with the CAM data later)
+      // Store the file path (not public URL since bucket is private)
+      // We'll use signed URLs when downloading
       setSupportingDocs(prev => ({
         ...prev,
-        [tower]: publicUrl
+        [tower]: fileName
       }));
 
       toast.success(`Supporting document uploaded for Tower ${tower}`);
