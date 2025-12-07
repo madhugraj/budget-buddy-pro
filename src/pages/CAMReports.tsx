@@ -147,15 +147,39 @@ export default function CAMReports() {
         return MONTHS.find(m => m.value === month)?.label || `M${month}`;
     };
 
-    const downloadDocument = (url: string, tower: string, year: number) => {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `CAM_${tower}_${year}.pdf`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Document download started');
+    const downloadDocument = async (filePath: string, tower: string, year: number) => {
+        try {
+            // Create a signed URL for the private 'cam' bucket
+            const { data, error } = await supabase.storage
+                .from('cam')
+                .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+            if (error) throw error;
+
+            const link = document.createElement('a');
+            link.href = data.signedUrl;
+            link.download = `CAM_${tower}_${year}.pdf`;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success('Document download started');
+        } catch (error: any) {
+            toast.error('Failed to download document: ' + error.message);
+        }
+    };
+
+    const previewDocument = async (filePath: string) => {
+        try {
+            const { data, error } = await supabase.storage
+                .from('cam')
+                .createSignedUrl(filePath, 3600);
+
+            if (error) throw error;
+            window.open(data.signedUrl, '_blank');
+        } catch (error: any) {
+            toast.error('Failed to preview document: ' + error.message);
+        }
     };
 
     const getPeriodDisplay = (doc: CAMDocument) => {
@@ -393,7 +417,7 @@ export default function CAMReports() {
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
-                                                            onClick={() => window.open(doc.document_url!, '_blank')}
+                                                            onClick={() => previewDocument(doc.document_url!)}
                                                         >
                                                             <Eye className="w-4 h-4 mr-1" />
                                                             Preview
@@ -407,7 +431,7 @@ export default function CAMReports() {
                                                         </Button>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-muted-foreground text-sm">No document</span>
+                                                    <span className="text-muted-foreground text-sm">No document uploaded</span>
                                                 )}
                                             </TableCell>
                                         </TableRow>
