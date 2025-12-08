@@ -6,14 +6,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, FileText, Loader2, ExternalLink, Eye } from 'lucide-react';
+import { Download, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-const TOWERS = [
-    'All', '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
+const ALL_TOWERS = [
+    '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
     '9A', '9B', '9C', '10', '11', '12', '13', '14', '15A', '15B',
     '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'
 ];
+
+const TOWERS = ['All', ...ALL_TOWERS];
 
 const PERIOD_TYPES = [
     { value: 'monthly', label: 'Monthly' },
@@ -23,15 +26,15 @@ const PERIOD_TYPES = [
 ];
 
 const QUARTERS = [
-    { value: 1, label: 'Q1 (Apr-Jun)' },
-    { value: 2, label: 'Q2 (Jul-Sep)' },
-    { value: 3, label: 'Q3 (Oct-Dec)' },
-    { value: 4, label: 'Q4 (Jan-Mar)' }
+    { value: 1, label: 'Q1 (Apr-Jun)', months: [4, 5, 6] },
+    { value: 2, label: 'Q2 (Jul-Sep)', months: [7, 8, 9] },
+    { value: 3, label: 'Q3 (Oct-Dec)', months: [10, 11, 12] },
+    { value: 4, label: 'Q4 (Jan-Mar)', months: [1, 2, 3] }
 ];
 
 const HALF_YEARS = [
-    { value: 'H1', label: 'H1 (Apr-Sep)' },
-    { value: 'H2', label: 'H2 (Oct-Mar)' }
+    { value: 'H1', label: 'H1 (Apr-Sep)', months: [4, 5, 6, 7, 8, 9] },
+    { value: 'H2', label: 'H2 (Oct-Mar)', months: [10, 11, 12, 1, 2, 3] }
 ];
 
 const MONTHS = [
@@ -56,16 +59,26 @@ interface CAMDocument {
     total_flats: number;
 }
 
+interface MissingDocument {
+    tower: string;
+    month: number;
+    year: number;
+    hasRecord: boolean;
+    hasDocument: boolean;
+}
+
 export default function CAMReports() {
     const { userRole } = useAuth();
     const [loading, setLoading] = useState(false);
     const [documents, setDocuments] = useState<CAMDocument[]>([]);
+    const [missingDocuments, setMissingDocuments] = useState<MissingDocument[]>([]);
     const [selectedTower, setSelectedTower] = useState('All');
     const [selectedPeriodType, setSelectedPeriodType] = useState('monthly');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
-    const [selectedQuarter, setSelectedQuarter] = useState<number>(1);
-    const [selectedHalfYear, setSelectedHalfYear] = useState<string>('H1');
+    const [selectedQuarter, setSelectedQuarter] = useState<number>(Math.ceil((new Date().getMonth() + 1) / 3));
+    const [selectedHalfYear, setSelectedHalfYear] = useState<string>(new Date().getMonth() < 6 ? 'H1' : 'H2');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [activeTab, setActiveTab] = useState('documents');
 
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
@@ -75,62 +88,64 @@ export default function CAMReports() {
         }
     }, [selectedTower, selectedPeriodType, selectedMonth, selectedQuarter, selectedHalfYear, selectedYear, userRole]);
 
+    const getMonthsForPeriod = (): number[] => {
+        if (selectedPeriodType === 'monthly') {
+            return [selectedMonth];
+        } else if (selectedPeriodType === 'quarterly') {
+            return QUARTERS.find(q => q.value === selectedQuarter)?.months || [];
+        } else if (selectedPeriodType === 'half_yearly') {
+            return HALF_YEARS.find(h => h.value === selectedHalfYear)?.months || [];
+        } else {
+            // Yearly - all 12 months
+            return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        }
+    };
+
     const loadDocuments = async () => {
         setLoading(true);
         try {
+            const monthsToQuery = getMonthsForPeriod();
+            
             let query = supabase
                 .from('cam_tracking')
                 .select('id, tower, quarter, year, month, document_url, status, submitted_at, approved_at, paid_flats, pending_flats, total_flats')
                 .eq('year', selectedYear)
+                .in('month', monthsToQuery)
                 .in('status', ['submitted', 'approved'])
                 .order('tower')
-                .order('quarter');
+                .order('month');
 
             // Tower filter
             if (selectedTower !== 'All') {
                 query = query.eq('tower', selectedTower);
             }
 
-            // Period-based filtering
-            if (selectedPeriodType === 'monthly') {
-                query = query.eq('month', selectedMonth);
-            } else if (selectedPeriodType === 'quarterly') {
-                query = query.eq('quarter', selectedQuarter);
-            } else if (selectedPeriodType === 'half_yearly') {
-                if (selectedHalfYear === 'H1') {
-                    query = query.in('quarter', [1, 2]);
-                } else {
-                    query = query.in('quarter', [3, 4]);
-                }
-            }
-            // For 'yearly', no additional filter needed
-
             const { data, error } = await query;
 
             if (error) throw error;
 
-            // Group by tower and period to get unique records
-            const uniqueDocs = new Map<string, CAMDocument>();
-
-            data?.forEach(record => {
-                let key: string;
-                if (selectedPeriodType === 'monthly') {
-                    key = `${record.tower}-${record.month}-${record.year}`;
-                } else if (selectedPeriodType === 'quarterly') {
-                    key = `${record.tower}-Q${record.quarter}-${record.year}`;
-                } else if (selectedPeriodType === 'half_yearly') {
-                    const halfYear = record.quarter <= 2 ? 'H1' : 'H2';
-                    key = `${record.tower}-${halfYear}-${record.year}`;
-                } else {
-                    key = `${record.tower}-${record.year}`;
-                }
-
-                if (!uniqueDocs.has(key)) {
-                    uniqueDocs.set(key, record as CAMDocument);
-                }
+            setDocuments(data as CAMDocument[] || []);
+            
+            // Calculate missing documents
+            const towersToCheck = selectedTower === 'All' ? ALL_TOWERS : [selectedTower];
+            const missing: MissingDocument[] = [];
+            
+            towersToCheck.forEach(tower => {
+                monthsToQuery.forEach(month => {
+                    const record = data?.find(d => d.tower === tower && d.month === month);
+                    if (!record || !record.document_url) {
+                        missing.push({
+                            tower,
+                            month,
+                            year: selectedYear,
+                            hasRecord: !!record,
+                            hasDocument: false
+                        });
+                    }
+                });
             });
-
-            setDocuments(Array.from(uniqueDocs.values()));
+            
+            setMissingDocuments(missing);
         } catch (error: any) {
             toast.error('Failed to load CAM records: ' + error.message);
         } finally {
@@ -180,13 +195,14 @@ export default function CAMReports() {
         return documentUrl;
     };
 
-    const downloadDocument = async (documentUrl: string, tower: string, year: number) => {
+    const downloadDocument = async (documentUrl: string, tower: string, month: number | null, year: number) => {
         try {
             const downloadUrl = await getSignedUrl(documentUrl);
+            const monthLabel = month ? getMonthLabel(month).substring(0, 3) : '';
 
             const link = document.createElement('a');
             link.href = downloadUrl;
-            link.download = `CAM_${tower}_${year}.xlsx`;
+            link.download = `CAM_${tower}_${monthLabel}_${year}.xlsx`;
             link.target = '_blank';
             document.body.appendChild(link);
             link.click();
@@ -197,25 +213,8 @@ export default function CAMReports() {
         }
     };
 
-    const previewDocument = async (documentUrl: string) => {
-        try {
-            const previewUrl = await getSignedUrl(documentUrl);
-            window.open(previewUrl, '_blank');
-        } catch (error: any) {
-            toast.error('Failed to preview document: ' + error.message);
-        }
-    };
-
     const getPeriodDisplay = (doc: CAMDocument) => {
-        if (selectedPeriodType === 'monthly') {
-            return getMonthLabel(doc.month);
-        } else if (selectedPeriodType === 'quarterly') {
-            return getQuarterLabel(doc.quarter);
-        } else if (selectedPeriodType === 'half_yearly') {
-            return doc.quarter <= 2 ? 'H1 (Apr-Sep)' : 'H2 (Oct-Mar)';
-        } else {
-            return `FY ${doc.year}`;
-        }
+        return getMonthLabel(doc.month);
     };
 
     if (userRole !== 'treasurer' && userRole !== 'lead') {
@@ -358,7 +357,7 @@ export default function CAMReports() {
 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-sm text-muted-foreground">
-                            {documents.length} record(s) found
+                            {documents.length} document(s) found | {missingDocuments.length} missing
                         </div>
                         <Button
                             variant="outline"
@@ -366,8 +365,8 @@ export default function CAMReports() {
                                 setSelectedTower('All');
                                 setSelectedPeriodType('monthly');
                                 setSelectedMonth(new Date().getMonth() + 1);
-                                setSelectedQuarter(1);
-                                setSelectedHalfYear('H1');
+                                setSelectedQuarter(Math.ceil((new Date().getMonth() + 1) / 3));
+                                setSelectedHalfYear(new Date().getMonth() < 6 ? 'H1' : 'H2');
                             }}
                         >
                             Reset Filters
@@ -377,93 +376,143 @@ export default function CAMReports() {
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>CAM Records</CardTitle>
-                    <CardDescription>
-                        View status and download supporting documents
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin" />
-                        </div>
-                    ) : documents.length === 0 ? (
-                        <p className="text-center py-8 text-muted-foreground">
-                            No records found for the selected filters
-                        </p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Tower</TableHead>
-                                        <TableHead>Period</TableHead>
-                                        <TableHead>Year</TableHead>
-                                        <TableHead className="text-center">Paid</TableHead>
-                                        <TableHead className="text-center">Pending</TableHead>
-                                        <TableHead className="text-center">Total</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Submitted</TableHead>
-                                        <TableHead>Approved</TableHead>
-                                        <TableHead className="text-right">Document</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {documents.map((doc) => (
-                                        <TableRow key={doc.id}>
-                                            <TableCell className="font-medium">{doc.tower}</TableCell>
-                                            <TableCell>{getPeriodDisplay(doc)}</TableCell>
-                                            <TableCell>{doc.year}</TableCell>
-                                            <TableCell className="text-center text-green-600 font-medium">
-                                                {doc.paid_flats}
-                                            </TableCell>
-                                            <TableCell className="text-center text-red-600 font-medium">
-                                                {doc.pending_flats}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                {doc.total_flats}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
-                                                    {doc.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {doc.submitted_at ? new Date(doc.submitted_at).toLocaleDateString() : '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {doc.approved_at ? new Date(doc.approved_at).toLocaleDateString() : '-'}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {doc.document_url ? (
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => previewDocument(doc.document_url!)}
-                                                        >
-                                                            <Eye className="w-4 h-4 mr-1" />
-                                                            Preview
-                                                        </Button>
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.year)}
-                                                        >
-                                                            <Download className="w-4 h-4 mr-1" />
-                                                            Download
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground text-sm">No document uploaded</span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                <CardContent className="pt-6">
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList className="mb-4">
+                            <TabsTrigger value="documents">
+                                Uploaded Documents ({documents.filter(d => d.document_url).length})
+                            </TabsTrigger>
+                            <TabsTrigger value="missing" className="text-destructive">
+                                Missing Documents ({missingDocuments.length})
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="documents">
+                            {loading ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                </div>
+                            ) : documents.length === 0 ? (
+                                <p className="text-center py-8 text-muted-foreground">
+                                    No records found for the selected filters
+                                </p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Tower</TableHead>
+                                                <TableHead>Month</TableHead>
+                                                <TableHead>Year</TableHead>
+                                                <TableHead className="text-center">Paid</TableHead>
+                                                <TableHead className="text-center">Pending</TableHead>
+                                                <TableHead className="text-center">Total</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Submitted</TableHead>
+                                                <TableHead>Approved</TableHead>
+                                                <TableHead className="text-right">Document</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {documents.map((doc) => (
+                                                <TableRow key={doc.id}>
+                                                    <TableCell className="font-medium">{doc.tower}</TableCell>
+                                                    <TableCell>{getPeriodDisplay(doc)}</TableCell>
+                                                    <TableCell>{doc.year}</TableCell>
+                                                    <TableCell className="text-center text-green-600 font-medium">
+                                                        {doc.paid_flats}
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-red-600 font-medium">
+                                                        {doc.pending_flats}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {doc.total_flats}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={doc.status === 'approved' ? 'default' : 'secondary'}>
+                                                            {doc.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {doc.submitted_at ? new Date(doc.submitted_at).toLocaleDateString() : '-'}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {doc.approved_at ? new Date(doc.approved_at).toLocaleDateString() : '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        {doc.document_url ? (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.month, doc.year)}
+                                                            >
+                                                                <Download className="w-4 h-4 mr-1" />
+                                                                Download
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-sm">No document</span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="missing">
+                            {loading ? (
+                                <div className="flex justify-center py-8">
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                </div>
+                            ) : missingDocuments.length === 0 ? (
+                                <div className="text-center py-8 text-green-600">
+                                    All documents are uploaded for the selected period!
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
+                                        <AlertTriangle className="h-5 w-5" />
+                                        <span className="text-sm font-medium">
+                                            {missingDocuments.length} tower-month combinations are missing documents
+                                        </span>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Tower</TableHead>
+                                                    <TableHead>Month</TableHead>
+                                                    <TableHead>Year</TableHead>
+                                                    <TableHead>CAM Record</TableHead>
+                                                    <TableHead>Document Status</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {missingDocuments.map((item, idx) => (
+                                                    <TableRow key={`${item.tower}-${item.month}-${item.year}-${idx}`}>
+                                                        <TableCell className="font-medium">{item.tower}</TableCell>
+                                                        <TableCell>{getMonthLabel(item.month)}</TableCell>
+                                                        <TableCell>{item.year}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={item.hasRecord ? 'secondary' : 'destructive'}>
+                                                                {item.hasRecord ? 'Record exists' : 'No record'}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="destructive">
+                                                                Not uploaded
+                                                            </Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
         </div>
