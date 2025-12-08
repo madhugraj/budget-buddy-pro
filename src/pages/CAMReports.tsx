@@ -147,22 +147,42 @@ export default function CAMReports() {
         return MONTHS.find(m => m.value === month)?.label || `M${month}`;
     };
 
-    // Check if document_url is a full URL (old invoices bucket) or a file path (new cam bucket)
+    // Extract file path from invoices bucket URL
+    const extractInvoicesPath = (url: string): string | null => {
+        const match = url.match(/\/storage\/v1\/object\/public\/invoices\/(.+)$/);
+        return match ? match[1] : null;
+    };
+
+    // Check if document_url is a full URL or a file path
     const isFullUrl = (url: string) => url.startsWith('http://') || url.startsWith('https://');
+
+    const getSignedUrl = async (documentUrl: string): Promise<string> => {
+        // Check if it's from the old invoices bucket (private bucket, public URL won't work)
+        const invoicesPath = extractInvoicesPath(documentUrl);
+        if (invoicesPath) {
+            const { data, error } = await supabase.storage
+                .from('invoices')
+                .createSignedUrl(invoicesPath, 3600);
+            if (error) throw error;
+            return data.signedUrl;
+        }
+        
+        // If it's a file path (not full URL), it's in the 'cam' bucket
+        if (!isFullUrl(documentUrl)) {
+            const { data, error } = await supabase.storage
+                .from('cam')
+                .createSignedUrl(documentUrl, 3600);
+            if (error) throw error;
+            return data.signedUrl;
+        }
+        
+        // Otherwise return as-is (truly public URL)
+        return documentUrl;
+    };
 
     const downloadDocument = async (documentUrl: string, tower: string, year: number) => {
         try {
-            let downloadUrl = documentUrl;
-            
-            // If it's not a full URL, it's a file path in the 'cam' bucket - get signed URL
-            if (!isFullUrl(documentUrl)) {
-                const { data, error } = await supabase.storage
-                    .from('cam')
-                    .createSignedUrl(documentUrl, 3600); // 1 hour expiry
-
-                if (error) throw error;
-                downloadUrl = data.signedUrl;
-            }
+            const downloadUrl = await getSignedUrl(documentUrl);
 
             const link = document.createElement('a');
             link.href = downloadUrl;
@@ -179,18 +199,7 @@ export default function CAMReports() {
 
     const previewDocument = async (documentUrl: string) => {
         try {
-            let previewUrl = documentUrl;
-            
-            // If it's not a full URL, it's a file path in the 'cam' bucket - get signed URL
-            if (!isFullUrl(documentUrl)) {
-                const { data, error } = await supabase.storage
-                    .from('cam')
-                    .createSignedUrl(documentUrl, 3600);
-
-                if (error) throw error;
-                previewUrl = data.signedUrl;
-            }
-            
+            const previewUrl = await getSignedUrl(documentUrl);
             window.open(previewUrl, '_blank');
         } catch (error: any) {
             toast.error('Failed to preview document: ' + error.message);
