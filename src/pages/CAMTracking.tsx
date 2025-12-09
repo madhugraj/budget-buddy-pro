@@ -983,21 +983,28 @@ function QuarterlySummary() {
 
     const qData = summaryData.filter(d => quarterConfig.months.includes(d.month || 0));
 
-    // For total flats, we shouldn't sum them up across months, as it's the same flats.
-    // But paid/pending are cumulative? 
-    // Wait, if I pay for April and May, my total paid is sum of both.
-    // Total flats for the quarter? 
-    // Usually "Total Flats" is constant for the complex.
-    // But if we are showing "Collection Rate", it should be (Total Paid / (Total Flats * 3))?
-    // Or is it (Total Paid / Total Demand)?
-    // Total Demand for a quarter = Total Flats * 3 (if monthly billing).
-    // Let's assume Total Demand = Total Flats * 3.
+    // Group data by tower to find the latest month for each tower
+    const towerLatestData: Record<string, CAMData> = {};
 
-    const totalDemand = TOTAL_FLATS_IN_COMPLEX * 3;
+    qData.forEach(d => {
+      if (!towerLatestData[d.tower] || (d.month || 0) > (towerLatestData[d.tower].month || 0)) {
+        towerLatestData[d.tower] = d;
+      }
+    });
+
+    // For Paid and Pending, we take the status from the LATEST month of the quarter for each tower
+    // This represents the final position for the quarter
+    const totalPaid = Object.values(towerLatestData).reduce((sum, d) => sum + d.paid_flats, 0);
+    const totalPending = Object.values(towerLatestData).reduce((sum, d) => sum + d.pending_flats, 0);
+
+    // For Total Demand: Since it's a quarterly invoice, the demand is just the total flats (1 invoice per flat)
+    // We don't multiply by 3 anymore.
+    const totalDemand = TOTAL_FLATS_IN_COMPLEX;
 
     return {
-      paid: qData.reduce((sum, d) => sum + d.paid_flats, 0),
-      pending: qData.reduce((sum, d) => sum + d.pending_flats, 0),
+      paid: totalPaid,
+      pending: totalPending,
+      // Dues cleared and Advance are flows/transactions, so we sum them up across all months
       duesCleared: qData.reduce((sum, d) => sum + (d.dues_cleared_from_previous || 0), 0),
       advance: qData.reduce((sum, d) => sum + (d.advance_payments || 0), 0),
       total: totalDemand
@@ -1094,12 +1101,15 @@ function QuarterlySummary() {
                     {FISCAL_QUARTERS.map(q => {
                       const qMonths = q.months;
                       const towerData = summaryData.filter(d => d.tower === tower && qMonths.includes(d.month || 0));
-                      const totalPending = towerData.reduce((sum, d) => sum + d.pending_flats, 0);
 
-                      // Note: Summing pending flats across months might be misleading if it's the same flat pending for 3 months.
-                      // But "Pending Flats" usually means "Number of flats that haven't paid for this month".
-                      // So if Flat 101 didn't pay for Apr, May, Jun -> it contributes 1 to each month's pending count.
-                      // So Sum is correct for "Total Pending Instances".
+                      // Find the record for the latest month in this quarter
+                      // We sort simply by finding the max month
+                      const latestRecord = towerData.reduce<CAMData | null>((prev, current) => {
+                        return (!prev || (current.month || 0) > (prev.month || 0)) ? current : prev;
+                      }, null);
+
+                      // Use pending flats from the latest record, or 0 if no data
+                      const totalPending = latestRecord ? latestRecord.pending_flats : 0;
 
                       return (
                         <TableCell key={q.value} className="text-center">
