@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
+import { LeadNotificationBell } from '@/components/LeadNotificationBell';
 import { AutoLogout } from '@/components/AutoLogout';
 
 const navigation = [
@@ -131,6 +132,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <h1 className="text-lg font-semibold">Expense Manager</h1>
           <div className="flex items-center gap-2">
             {user && <NotificationBell />}
+            {user && <LeadNotificationBell />}
             {!user && (
               <Button
                 variant="default"
@@ -183,6 +185,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             ) : (
               <div className="flex items-center gap-3">
                 <NotificationBell />
+                <LeadNotificationBell />
                 <Button
                   variant="ghost"
                   size="sm"

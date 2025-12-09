@@ -6,9 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Download, FileText, Loader2, AlertTriangle } from 'lucide-react';
+import { Download, FileText, Loader2, AlertTriangle, Eye, Send, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExcelPreviewDialog } from '@/components/ExcelPreviewDialog';
 
 const ALL_TOWERS = [
     '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
@@ -59,26 +61,36 @@ interface CAMDocument {
     total_flats: number;
 }
 
-interface MissingDocument {
+interface MissingQuarter {
     tower: string;
-    month: number;
+    quarter: number;
     year: number;
-    hasRecord: boolean;
+    quarterLabel: string;
+    hasAnyRecord: boolean;
     hasDocument: boolean;
+    recordCount: number;
 }
 
 export default function CAMReports() {
-    const { userRole } = useAuth();
+    const { userRole, user } = useAuth();
     const [loading, setLoading] = useState(false);
+    const [sendingReminders, setSendingReminders] = useState(false);
     const [documents, setDocuments] = useState<CAMDocument[]>([]);
-    const [missingDocuments, setMissingDocuments] = useState<MissingDocument[]>([]);
+    const [missingQuarters, setMissingQuarters] = useState<MissingQuarter[]>([]);
     const [selectedTower, setSelectedTower] = useState('All');
-    const [selectedPeriodType, setSelectedPeriodType] = useState('monthly');
+    const [selectedPeriodType, setSelectedPeriodType] = useState('quarterly');
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
     const [selectedQuarter, setSelectedQuarter] = useState<number>(Math.ceil((new Date().getMonth() + 1) / 3));
     const [selectedHalfYear, setSelectedHalfYear] = useState<string>(new Date().getMonth() < 6 ? 'H1' : 'H2');
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('documents');
+    const [selectedMissing, setSelectedMissing] = useState<Set<string>>(new Set());
+    
+    // Preview state
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [previewTitle, setPreviewTitle] = useState('');
+    const [currentDownloadFn, setCurrentDownloadFn] = useState<(() => void) | null>(null);
 
     const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
@@ -96,8 +108,22 @@ export default function CAMReports() {
         } else if (selectedPeriodType === 'half_yearly') {
             return HALF_YEARS.find(h => h.value === selectedHalfYear)?.months || [];
         } else {
-            // Yearly - all 12 months
             return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        }
+    };
+
+    const getQuartersForPeriod = (): number[] => {
+        if (selectedPeriodType === 'monthly') {
+            // Find which quarter this month belongs to
+            const q = QUARTERS.find(q => q.months.includes(selectedMonth));
+            return q ? [q.value] : [];
+        } else if (selectedPeriodType === 'quarterly') {
+            return [selectedQuarter];
+        } else if (selectedPeriodType === 'half_yearly') {
+            if (selectedHalfYear === 'H1') return [1, 2];
+            return [3, 4];
+        } else {
+            return [1, 2, 3, 4];
         }
     };
 
@@ -115,7 +141,6 @@ export default function CAMReports() {
                 .order('tower')
                 .order('month');
 
-            // Tower filter
             if (selectedTower !== 'All') {
                 query = query.eq('tower', selectedTower);
             }
@@ -126,26 +151,42 @@ export default function CAMReports() {
 
             setDocuments(data as CAMDocument[] || []);
             
-            // Calculate missing documents
+            // Calculate missing quarters (CAM is quarterly-based)
             const towersToCheck = selectedTower === 'All' ? ALL_TOWERS : [selectedTower];
-            const missing: MissingDocument[] = [];
+            const quartersToCheck = getQuartersForPeriod();
+            const missing: MissingQuarter[] = [];
             
             towersToCheck.forEach(tower => {
-                monthsToQuery.forEach(month => {
-                    const record = data?.find(d => d.tower === tower && d.month === month);
-                    if (!record || !record.document_url) {
+                quartersToCheck.forEach(quarter => {
+                    const quarterData = QUARTERS.find(q => q.value === quarter);
+                    if (!quarterData) return;
+                    
+                    // Check if any record exists for this tower in this quarter
+                    const quarterRecords = data?.filter(d => 
+                        d.tower === tower && 
+                        quarterData.months.includes(d.month as number)
+                    ) || [];
+                    
+                    // Check if any record has a document
+                    const hasDocument = quarterRecords.some(r => r.document_url);
+                    
+                    // A quarter is considered missing if there's no document for the quarter
+                    if (!hasDocument) {
                         missing.push({
                             tower,
-                            month,
+                            quarter,
                             year: selectedYear,
-                            hasRecord: !!record,
-                            hasDocument: false
+                            quarterLabel: quarterData.label,
+                            hasAnyRecord: quarterRecords.length > 0,
+                            hasDocument: false,
+                            recordCount: quarterRecords.length
                         });
                     }
                 });
             });
             
-            setMissingDocuments(missing);
+            setMissingQuarters(missing);
+            setSelectedMissing(new Set());
         } catch (error: any) {
             toast.error('Failed to load CAM records: ' + error.message);
         } finally {
@@ -162,17 +203,14 @@ export default function CAMReports() {
         return MONTHS.find(m => m.value === month)?.label || `M${month}`;
     };
 
-    // Extract file path from invoices bucket URL
     const extractInvoicesPath = (url: string): string | null => {
         const match = url.match(/\/storage\/v1\/object\/public\/invoices\/(.+)$/);
         return match ? match[1] : null;
     };
 
-    // Check if document_url is a full URL or a file path
     const isFullUrl = (url: string) => url.startsWith('http://') || url.startsWith('https://');
 
     const getSignedUrl = async (documentUrl: string): Promise<string> => {
-        // Check if it's from the old invoices bucket (private bucket, public URL won't work)
         const invoicesPath = extractInvoicesPath(documentUrl);
         if (invoicesPath) {
             const { data, error } = await supabase.storage
@@ -182,7 +220,6 @@ export default function CAMReports() {
             return data.signedUrl;
         }
         
-        // If it's a file path (not full URL), it's in the 'cam' bucket
         if (!isFullUrl(documentUrl)) {
             const { data, error } = await supabase.storage
                 .from('cam')
@@ -191,7 +228,6 @@ export default function CAMReports() {
             return data.signedUrl;
         }
         
-        // Otherwise return as-is (truly public URL)
         return documentUrl;
     };
 
@@ -210,6 +246,97 @@ export default function CAMReports() {
             toast.success('Document download started');
         } catch (error: any) {
             toast.error('Failed to download document: ' + error.message);
+        }
+    };
+
+    const previewDocument = async (documentUrl: string, tower: string, month: number | null, year: number) => {
+        try {
+            const signedUrl = await getSignedUrl(documentUrl);
+            const monthLabel = month ? getMonthLabel(month).substring(0, 3) : '';
+            
+            setPreviewUrl(signedUrl);
+            setPreviewTitle(`CAM Document - Tower ${tower} - ${monthLabel} ${year}`);
+            setCurrentDownloadFn(() => () => downloadDocument(documentUrl, tower, month, year));
+            setPreviewOpen(true);
+        } catch (error: any) {
+            toast.error('Failed to load document preview: ' + error.message);
+        }
+    };
+
+    const toggleSelectMissing = (key: string) => {
+        setSelectedMissing(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAllMissing = () => {
+        if (selectedMissing.size === missingQuarters.length) {
+            setSelectedMissing(new Set());
+        } else {
+            setSelectedMissing(new Set(missingQuarters.map(m => `${m.tower}-${m.quarter}-${m.year}`)));
+        }
+    };
+
+    const sendReminders = async () => {
+        if (selectedMissing.size === 0) {
+            toast.error('Please select at least one missing record');
+            return;
+        }
+
+        if (userRole !== 'treasurer') {
+            toast.error('Only treasurers can send reminders');
+            return;
+        }
+
+        setSendingReminders(true);
+        try {
+            // Get all lead users
+            const { data: leadRoles, error: rolesError } = await supabase
+                .from('user_roles')
+                .select('user_id')
+                .eq('role', 'lead');
+
+            if (rolesError) throw rolesError;
+
+            if (!leadRoles || leadRoles.length === 0) {
+                toast.error('No lead users found to notify');
+                return;
+            }
+
+            // Create notifications for each selected missing item for each lead
+            const selectedItems = missingQuarters.filter(m => 
+                selectedMissing.has(`${m.tower}-${m.quarter}-${m.year}`)
+            );
+
+            const notifications = leadRoles.flatMap(lead => 
+                selectedItems.map(item => ({
+                    user_id: lead.user_id,
+                    type: 'cam_reminder',
+                    title: `CAM Document Missing - Tower ${item.tower}`,
+                    message: `Please upload CAM document for Tower ${item.tower}, ${item.quarterLabel} ${item.year}`,
+                    created_by: user?.id
+                }))
+            );
+
+            const { error: insertError } = await supabase
+                .from('notifications')
+                .insert(notifications);
+
+            if (insertError) throw insertError;
+
+            toast.success(`Reminders sent for ${selectedItems.length} missing document(s) to ${leadRoles.length} lead(s)`);
+            setSelectedMissing(new Set());
+        } catch (error: any) {
+            console.error('Error sending reminders:', error);
+            toast.error('Failed to send reminders: ' + error.message);
+        } finally {
+            setSendingReminders(false);
         }
     };
 
@@ -247,7 +374,7 @@ export default function CAMReports() {
                 <CardHeader>
                     <CardTitle>Filter Documents</CardTitle>
                     <CardDescription>
-                        Select filters to view CAM supporting documents
+                        Select filters to view CAM supporting documents. CAM invoices are generated quarterly.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -357,13 +484,13 @@ export default function CAMReports() {
 
                     <div className="flex justify-between items-center pt-4 border-t">
                         <div className="text-sm text-muted-foreground">
-                            {documents.length} document(s) found | {missingDocuments.length} missing
+                            {documents.filter(d => d.document_url).length} document(s) found | {missingQuarters.length} quarter(s) missing
                         </div>
                         <Button
                             variant="outline"
                             onClick={() => {
                                 setSelectedTower('All');
-                                setSelectedPeriodType('monthly');
+                                setSelectedPeriodType('quarterly');
                                 setSelectedMonth(new Date().getMonth() + 1);
                                 setSelectedQuarter(Math.ceil((new Date().getMonth() + 1) / 3));
                                 setSelectedHalfYear(new Date().getMonth() < 6 ? 'H1' : 'H2');
@@ -383,7 +510,7 @@ export default function CAMReports() {
                                 Uploaded Documents ({documents.filter(d => d.document_url).length})
                             </TabsTrigger>
                             <TabsTrigger value="missing" className="text-destructive">
-                                Missing Documents ({missingDocuments.length})
+                                Missing Documents ({missingQuarters.length})
                             </TabsTrigger>
                         </TabsList>
 
@@ -410,7 +537,7 @@ export default function CAMReports() {
                                                 <TableHead>Status</TableHead>
                                                 <TableHead>Submitted</TableHead>
                                                 <TableHead>Approved</TableHead>
-                                                <TableHead className="text-right">Document</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -441,13 +568,23 @@ export default function CAMReports() {
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         {doc.document_url ? (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.month, doc.year)}
-                                                            >
-                                                                <Download className="w-4 h-4 mr-1" />
-                                                                Download
-                                                            </Button>
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() => previewDocument(doc.document_url!, doc.tower, doc.month, doc.year)}
+                                                                >
+                                                                    <Eye className="w-4 h-4 mr-1" />
+                                                                    View
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => downloadDocument(doc.document_url!, doc.tower, doc.month, doc.year)}
+                                                                >
+                                                                    <Download className="w-4 h-4 mr-1" />
+                                                                    Download
+                                                                </Button>
+                                                            </div>
                                                         ) : (
                                                             <span className="text-muted-foreground text-sm">No document</span>
                                                         )}
@@ -465,56 +602,109 @@ export default function CAMReports() {
                                 <div className="flex justify-center py-8">
                                     <Loader2 className="h-8 w-8 animate-spin" />
                                 </div>
-                            ) : missingDocuments.length === 0 ? (
-                                <div className="text-center py-8 text-green-600">
-                                    All documents are uploaded for the selected period!
+                            ) : missingQuarters.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-8 text-green-600">
+                                    <CheckCircle2 className="h-12 w-12 mb-2" />
+                                    <span>All CAM documents are uploaded for the selected period!</span>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
-                                        <AlertTriangle className="h-5 w-5" />
-                                        <span className="text-sm font-medium">
-                                            {missingDocuments.length} tower-month combinations are missing documents
-                                        </span>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-3 rounded-lg flex-1">
+                                            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+                                            <span className="text-sm font-medium">
+                                                {missingQuarters.length} tower-quarter combinations are missing documents
+                                            </span>
+                                        </div>
+                                        {userRole === 'treasurer' && (
+                                            <Button
+                                                onClick={sendReminders}
+                                                disabled={selectedMissing.size === 0 || sendingReminders}
+                                                className="ml-4"
+                                            >
+                                                {sendingReminders ? (
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                ) : (
+                                                    <Send className="w-4 h-4 mr-2" />
+                                                )}
+                                                Send Reminder ({selectedMissing.size})
+                                            </Button>
+                                        )}
                                     </div>
+                                    
                                     <div className="overflow-x-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
+                                                    {userRole === 'treasurer' && (
+                                                        <TableHead className="w-12">
+                                                            <Checkbox
+                                                                checked={selectedMissing.size === missingQuarters.length && missingQuarters.length > 0}
+                                                                onCheckedChange={toggleSelectAllMissing}
+                                                            />
+                                                        </TableHead>
+                                                    )}
                                                     <TableHead>Tower</TableHead>
-                                                    <TableHead>Month</TableHead>
+                                                    <TableHead>Quarter</TableHead>
                                                     <TableHead>Year</TableHead>
-                                                    <TableHead>CAM Record</TableHead>
+                                                    <TableHead>CAM Records</TableHead>
                                                     <TableHead>Document Status</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {missingDocuments.map((item, idx) => (
-                                                    <TableRow key={`${item.tower}-${item.month}-${item.year}-${idx}`}>
-                                                        <TableCell className="font-medium">{item.tower}</TableCell>
-                                                        <TableCell>{getMonthLabel(item.month)}</TableCell>
-                                                        <TableCell>{item.year}</TableCell>
-                                                        <TableCell>
-                                                            <Badge variant={item.hasRecord ? 'secondary' : 'destructive'}>
-                                                                {item.hasRecord ? 'Record exists' : 'No record'}
-                                                            </Badge>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Badge variant="destructive">
-                                                                Not uploaded
-                                                            </Badge>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
+                                                {missingQuarters.map((item) => {
+                                                    const key = `${item.tower}-${item.quarter}-${item.year}`;
+                                                    return (
+                                                        <TableRow key={key}>
+                                                            {userRole === 'treasurer' && (
+                                                                <TableCell>
+                                                                    <Checkbox
+                                                                        checked={selectedMissing.has(key)}
+                                                                        onCheckedChange={() => toggleSelectMissing(key)}
+                                                                    />
+                                                                </TableCell>
+                                                            )}
+                                                            <TableCell className="font-medium">{item.tower}</TableCell>
+                                                            <TableCell>{item.quarterLabel}</TableCell>
+                                                            <TableCell>{item.year}</TableCell>
+                                                            <TableCell>
+                                                                <Badge variant={item.hasAnyRecord ? 'secondary' : 'outline'}>
+                                                                    {item.hasAnyRecord 
+                                                                        ? `${item.recordCount} record(s) - no doc` 
+                                                                        : 'No records'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge variant="destructive">
+                                                                    Not uploaded
+                                                                </Badge>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
                                             </TableBody>
                                         </Table>
                                     </div>
+                                    
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Note: CAM invoices are generated quarterly. Payments can be made monthly within the quarter.
+                                        A quarter is marked as "missing" if no document has been uploaded for that period.
+                                    </p>
                                 </div>
                             )}
                         </TabsContent>
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Excel Preview Dialog */}
+            <ExcelPreviewDialog
+                open={previewOpen}
+                onOpenChange={setPreviewOpen}
+                documentUrl={previewUrl}
+                title={previewTitle}
+                onDownload={() => currentDownloadFn?.()}
+            />
         </div>
     );
 }
