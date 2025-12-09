@@ -85,7 +85,7 @@ export default function CAMReports() {
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('documents');
     const [selectedMissing, setSelectedMissing] = useState<Set<string>>(new Set());
-    
+
     // Preview state
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewUrl, setPreviewUrl] = useState('');
@@ -127,11 +127,34 @@ export default function CAMReports() {
         }
     };
 
+    const isQuarterStarted = (quarter: number, year: number) => {
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // 1-12
+        const currentYear = currentDate.getFullYear();
+
+        // Quarter start months: Q1->Apr(4), Q2->Jul(7), Q3->Oct(10), Q4->Jan(1).
+        // Note: Q4 of FY Year X starts in Jan of Year X+1.
+        const quarterStartMonths: Record<number, number> = { 1: 4, 2: 7, 3: 10, 4: 1 };
+        const startMonth = quarterStartMonths[quarter];
+
+        // Adjust calendar year for the quarter start
+        const quarterStartYear = quarter === 4 ? year + 1 : year;
+
+        // If start year is in the past, it definitely started
+        if (quarterStartYear < currentYear) return true;
+
+        // If start year is in the future, it definitely hasn't started
+        if (quarterStartYear > currentYear) return false;
+
+        // Same year, check month
+        return currentMonth >= startMonth;
+    };
+
     const loadDocuments = async () => {
         setLoading(true);
         try {
             const monthsToQuery = getMonthsForPeriod();
-            
+
             let query = supabase
                 .from('cam_tracking')
                 .select('id, tower, quarter, year, month, document_url, status, submitted_at, approved_at, paid_flats, pending_flats, total_flats')
@@ -150,26 +173,30 @@ export default function CAMReports() {
             if (error) throw error;
 
             setDocuments(data as CAMDocument[] || []);
-            
+
             // Calculate missing quarters (CAM is quarterly-based)
             const towersToCheck = selectedTower === 'All' ? ALL_TOWERS : [selectedTower];
             const quartersToCheck = getQuartersForPeriod();
             const missing: MissingQuarter[] = [];
-            
+
             towersToCheck.forEach(tower => {
                 quartersToCheck.forEach(quarter => {
                     const quarterData = QUARTERS.find(q => q.value === quarter);
                     if (!quarterData) return;
-                    
+
+                    // Skip future quarters
+                    if (!isQuarterStarted(quarter, selectedYear)) return;
+
                     // Check if any record exists for this tower in this quarter
-                    const quarterRecords = data?.filter(d => 
-                        d.tower === tower && 
+                    const quarterRecords = data?.filter(d =>
+                        d.tower === tower &&
                         quarterData.months.includes(d.month as number)
                     ) || [];
-                    
+
                     // Check if any record has a document
+                    // Logic: If at least one document exists (even partial), don't show in missing
                     const hasDocument = quarterRecords.some(r => r.document_url);
-                    
+
                     // A quarter is considered missing if there's no document for the quarter
                     if (!hasDocument) {
                         missing.push({
@@ -184,7 +211,7 @@ export default function CAMReports() {
                     }
                 });
             });
-            
+
             setMissingQuarters(missing);
             setSelectedMissing(new Set());
         } catch (error: any) {
@@ -219,7 +246,7 @@ export default function CAMReports() {
             if (error) throw error;
             return data.signedUrl;
         }
-        
+
         if (!isFullUrl(documentUrl)) {
             const { data, error } = await supabase.storage
                 .from('cam')
@@ -227,7 +254,7 @@ export default function CAMReports() {
             if (error) throw error;
             return data.signedUrl;
         }
-        
+
         return documentUrl;
     };
 
@@ -253,7 +280,7 @@ export default function CAMReports() {
         try {
             const signedUrl = await getSignedUrl(documentUrl);
             const monthLabel = month ? getMonthLabel(month).substring(0, 3) : '';
-            
+
             setPreviewUrl(signedUrl);
             setPreviewTitle(`CAM Document - Tower ${tower} - ${monthLabel} ${year}`);
             setCurrentDownloadFn(() => () => downloadDocument(documentUrl, tower, month, year));
@@ -310,11 +337,11 @@ export default function CAMReports() {
             }
 
             // Create notifications for each selected missing item for each lead
-            const selectedItems = missingQuarters.filter(m => 
+            const selectedItems = missingQuarters.filter(m =>
                 selectedMissing.has(`${m.tower}-${m.quarter}-${m.year}`)
             );
 
-            const notifications = leadRoles.flatMap(lead => 
+            const notifications = leadRoles.flatMap(lead =>
                 selectedItems.map(item => ({
                     user_id: lead.user_id,
                     type: 'cam_reminder',
@@ -424,8 +451,8 @@ export default function CAMReports() {
                         {selectedPeriodType === 'monthly' && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Month</label>
-                                <Select 
-                                    value={selectedMonth.toString()} 
+                                <Select
+                                    value={selectedMonth.toString()}
                                     onValueChange={(val) => setSelectedMonth(parseInt(val))}
                                 >
                                     <SelectTrigger>
@@ -445,8 +472,8 @@ export default function CAMReports() {
                         {selectedPeriodType === 'quarterly' && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Quarter</label>
-                                <Select 
-                                    value={selectedQuarter.toString()} 
+                                <Select
+                                    value={selectedQuarter.toString()}
                                     onValueChange={(val) => setSelectedQuarter(parseInt(val))}
                                 >
                                     <SelectTrigger>
@@ -631,7 +658,7 @@ export default function CAMReports() {
                                             </Button>
                                         )}
                                     </div>
-                                    
+
                                     <div className="overflow-x-auto">
                                         <Table>
                                             <TableHeader>
@@ -669,8 +696,8 @@ export default function CAMReports() {
                                                             <TableCell>{item.year}</TableCell>
                                                             <TableCell>
                                                                 <Badge variant={item.hasAnyRecord ? 'secondary' : 'outline'}>
-                                                                    {item.hasAnyRecord 
-                                                                        ? `${item.recordCount} record(s) - no doc` 
+                                                                    {item.hasAnyRecord
+                                                                        ? `${item.recordCount} record(s) - no doc`
                                                                         : 'No records'}
                                                                 </Badge>
                                                             </TableCell>
@@ -685,7 +712,7 @@ export default function CAMReports() {
                                             </TableBody>
                                         </Table>
                                     </div>
-                                    
+
                                     <p className="text-xs text-muted-foreground mt-2">
                                         Note: CAM invoices are generated quarterly. Payments can be made monthly within the quarter.
                                         A quarter is marked as "missing" if no document has been uploaded for that period.
