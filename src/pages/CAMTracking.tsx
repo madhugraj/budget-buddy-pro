@@ -574,6 +574,7 @@ export default function CAMTracking() {
         <TabsList>
           <TabsTrigger value="tower-entry">Tower-wise Entry</TabsTrigger>
           <TabsTrigger value="overview">All Towers Overview</TabsTrigger>
+          <TabsTrigger value="discrepancies">Discrepancy Check</TabsTrigger>
           <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
           {userRole === 'lead' && (
             <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>
@@ -847,6 +848,10 @@ export default function CAMTracking() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="discrepancies" className="space-y-4">
+          <DiscrepancyReport />
         </TabsContent>
 
         <TabsContent value="summary">
@@ -1127,5 +1132,180 @@ function QuarterlySummary() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function DiscrepancyReport() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [discrepancies, setDiscrepancies] = useState<any[]>([]);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [sendingAlert, setSendingAlert] = useState(false);
+
+  // Logic to identify impossible scenarios:
+  // 1. Pending count increasing within a quarter (e.g. Apr: 5, May: 7) - Impossible unless invoice generated mid-quarter?
+  //    Actually, user said: "residents have rights to pay in April or May... we cannot accumulate".
+  //    User logic: "Q1 April there are 5 defaulters and May 7... condition not possible."
+  //    So, Pending count should NEVER increase within a quarter. It can only stay same or decrease.
+
+  useEffect(() => {
+    checkDiscrepancies();
+  }, [selectedYear]);
+
+  const checkDiscrepancies = async () => {
+    setLoading(true);
+    try {
+      // Fetch all data for the fiscal year
+      const { data, error } = await supabase
+        .from('cam_tracking')
+        .select('*')
+        .or(`and(year.eq.${selectedYear},month.gte.4),and(year.eq.${selectedYear + 1},month.lte.3)`)
+        .order('tower')
+        .order('month');
+
+      if (error) throw error;
+      const records = data as CAMDataFromDB[];
+      const foundDiscrepancies: any[] = [];
+
+      TOWERS.forEach(tower => {
+        // Check each quarter
+        FISCAL_QUARTERS.forEach(quarter => {
+          const qMonths = quarter.months;
+          const towerQData = records.filter(r => r.tower === tower && qMonths.includes(r.month || 0));
+
+          // Sort by month index to ensure order
+          towerQData.sort((a, b) => qMonths.indexOf(a.month || 0) - qMonths.indexOf(b.month || 0));
+
+          if (towerQData.length < 2) return; // Need at least 2 months to compare
+
+          let previousPending = -1;
+          let previousMonth = -1;
+
+          towerQData.forEach(record => {
+            const currentPending = record.pending_flats;
+            const currentMonth = record.month || 0;
+
+            if (previousPending !== -1) {
+              // Check logic: Pending should not increase
+              if (currentPending > previousPending) {
+                foundDiscrepancies.push({
+                  id: `${tower}-${quarter.value}-${currentMonth}`,
+                  tower,
+                  quarter: quarter.label,
+                  month1: MONTH_NAMES[previousMonth],
+                  val1: previousPending,
+                  month2: MONTH_NAMES[currentMonth],
+                  val2: currentPending,
+                  type: 'Pending count increased', // "Impossible" increase
+                  description: `Pending count increased from ${previousPending} (${MONTH_NAMES[previousMonth]}) to ${currentPending} (${MONTH_NAMES[currentMonth]})`
+                });
+              }
+            }
+            previousPending = currentPending;
+            previousMonth = currentMonth;
+          });
+        });
+      });
+
+      setDiscrepancies(foundDiscrepancies);
+    } catch (error: any) {
+      toast.error('Error checking discrepancies: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendAlert = async (item: any) => {
+    if (!user) return;
+    setSendingAlert(true);
+    try {
+      // Find lead users to notify
+      const { data: leadRoles } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'lead');
+
+      if (!leadRoles || leadRoles.length === 0) {
+        toast.error("No lead users found to alert");
+        return;
+      }
+
+      const notifications = leadRoles.map(lead => ({
+        user_id: lead.user_id,
+        type: 'data_discrepancy',
+        title: `Data Discrepancy in Tower ${item.tower}`,
+        message: `${item.description}. Please verify data.`,
+        created_by: user.id
+      }));
+
+      const { error } = await supabase.from('notifications').insert(notifications);
+      if (error) throw error;
+
+      toast.success("Alert sent to Lead users");
+    } catch (error: any) {
+      toast.error("Failed to send alert: " + error.message);
+    } finally {
+      setSendingAlert(false);
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-amber-600">
+          <AlertCircle className="h-5 w-5" />
+          Data Discrepancy Report
+        </CardTitle>
+        <p className="text-muted-foreground">
+          Identify potential data entry errors. Pending counts should typically decrease or stay same within a quarter.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {discrepancies.length === 0 ? (
+          <div className="text-center py-8 text-green-600 flex flex-col items-center">
+            <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
+              <span className="text-xl">✓</span>
+            </div>
+            <p>No logical discrepancies found in pending counts.</p>
+          </div>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tower</TableHead>
+                  <TableHead>Quarter</TableHead>
+                  <TableHead>Issue</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {discrepancies.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell className="font-medium">{item.tower}</TableCell>
+                    <TableCell>{item.quarter}</TableCell>
+                    <TableCell>
+                      <Badge variant="destructive" className="bg-amber-600 hover:bg-amber-700">
+                        {item.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
+                        <Send className="h-4 w-4 mr-1" />
+                        Alert Lead
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
