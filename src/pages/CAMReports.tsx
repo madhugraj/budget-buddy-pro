@@ -657,6 +657,15 @@ export default function CAMReports() {
                                                 Send Reminder ({selectedMissing.size})
                                             </Button>
                                         )}
+                                        {userRole === 'lead' && (
+                                            <Button
+                                                onClick={() => window.location.href = '/cam-tracking'}
+                                                className="ml-4"
+                                            >
+                                                <FileText className="w-4 h-4 mr-2" />
+                                                Go to CAM Entry
+                                            </Button>
+                                        )}
                                     </div>
 
                                     <div className="overflow-x-auto">
@@ -676,6 +685,7 @@ export default function CAMReports() {
                                                     <TableHead>Year</TableHead>
                                                     <TableHead>CAM Records</TableHead>
                                                     <TableHead>Document Status</TableHead>
+                                                    {userRole === 'lead' && <TableHead>Action</TableHead>}
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -706,6 +716,17 @@ export default function CAMReports() {
                                                                     Not uploaded
                                                                 </Badge>
                                                             </TableCell>
+                                                            {userRole === 'lead' && (
+                                                                <TableCell>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => window.location.href = `/cam-tracking?tower=${item.tower}&quarter=${item.quarter}&year=${item.year}`}
+                                                                    >
+                                                                        Upload Document
+                                                                    </Button>
+                                                                </TableCell>
+                                                            )}
                                                         </TableRow>
                                                     );
                                                 })}
@@ -714,8 +735,9 @@ export default function CAMReports() {
                                     </div>
 
                                     <p className="text-xs text-muted-foreground mt-2">
-                                        Note: CAM invoices are generated quarterly. Payments can be made monthly within the quarter.
-                                        A quarter is marked as "missing" if no document has been uploaded for that period.
+                                        {userRole === 'treasurer' 
+                                            ? 'Note: Select missing records and click "Send Reminder" to notify Lead users.'
+                                            : 'Note: Click "Upload Document" to go to CAM Entry and upload the missing document for that tower-quarter.'}
                                     </p>
                                 </div>
                             )}
