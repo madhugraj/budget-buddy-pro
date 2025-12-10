@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,11 +86,24 @@ interface CAMDataFromDB {
 
 export default function CAMTracking() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  
+  // Parse URL parameters for pre-selection from discrepancy report
+  const urlTower = searchParams.get('tower');
+  const urlQuarter = searchParams.get('quarter');
+  const urlYear = searchParams.get('year');
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Fiscal Year
-  const [selectedQuarter, setSelectedQuarter] = useState(1); // Default to Q1
-  const [selectedTower, setSelectedTower] = useState<string>('1A');
+  const [selectedYear, setSelectedYear] = useState(() => {
+    return urlYear ? parseInt(urlYear) : new Date().getFullYear();
+  });
+  const [selectedQuarter, setSelectedQuarter] = useState(() => {
+    return urlQuarter ? parseInt(urlQuarter) : 1;
+  });
+  const [selectedTower, setSelectedTower] = useState<string>(() => {
+    return urlTower && TOWERS.includes(urlTower) ? urlTower : '1A';
+  });
   // Map: Tower -> Month -> Data
   const [camData, setCamData] = useState<Record<string, Record<number, CAMData>>>({});
   const [supportingDocs, setSupportingDocs] = useState<Record<string, string>>({});
