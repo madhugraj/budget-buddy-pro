@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, Save, Upload, Building2, AlertCircle, Download, Send } from 'lucide-react';
+import { Loader2, Save, Upload, Building2, AlertCircle, Download, Send, FileText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1141,6 +1141,20 @@ function DiscrepancyReport() {
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [sendingAlert, setSendingAlert] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setUserRole(data?.role || null);
+    };
+    fetchRole();
+  }, [user]);
 
   // Logic to identify impossible scenarios:
   // 1. Pending count increasing within a quarter (e.g. Apr: 5, May: 7) - Impossible unless invoice generated mid-quarter?
@@ -1192,6 +1206,7 @@ function DiscrepancyReport() {
                   id: `${tower}-${quarter.value}-${currentMonth}`,
                   tower,
                   quarter: quarter.label,
+                  quarterValue: quarter.value,
                   month1: MONTH_NAMES[previousMonth],
                   val1: previousPending,
                   month2: MONTH_NAMES[currentMonth],
@@ -1249,6 +1264,11 @@ function DiscrepancyReport() {
     }
   };
 
+  const navigateToCorrectEntry = (item: any) => {
+    // Navigate to CAM Tracking with the tower and quarter pre-selected
+    window.location.href = `/cam-tracking?tower=${item.tower}&quarter=${item.quarterValue}&year=${selectedYear}`;
+  };
+
   if (loading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
 
   return (
@@ -1294,10 +1314,17 @@ function DiscrepancyReport() {
                     </TableCell>
                     <TableCell>{item.description}</TableCell>
                     <TableCell className="text-right">
-                      <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
-                        <Send className="h-4 w-4 mr-1" />
-                        Alert Lead
-                      </Button>
+                      {userRole === 'treasurer' ? (
+                        <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
+                          <Send className="h-4 w-4 mr-1" />
+                          Alert Lead
+                        </Button>
+                      ) : userRole === 'lead' ? (
+                        <Button size="sm" variant="outline" onClick={() => navigateToCorrectEntry(item)}>
+                          <FileText className="h-4 w-4 mr-1" />
+                          Correct Entry
+                        </Button>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
