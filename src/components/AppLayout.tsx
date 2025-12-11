@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,17 @@ import {
   Building2,
   AlertCircle,
   Trophy,
+  ChevronLeft,
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Sheet,
   SheetContent,
@@ -51,6 +61,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { signOut, userRole, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Filter navigation based on user role
   const filteredNavigation = navigation.filter(item =>
@@ -58,26 +69,35 @@ export function AppLayout({ children }: { children: ReactNode }) {
   );
 
   const NavLinks = () => (
-    <>
+    <TooltipProvider delayDuration={0}>
       {filteredNavigation.map((item) => {
         const isActive = location.pathname === item.href;
         return (
-          <Link
-            key={item.name}
-            to={item.href}
-            className={cn(
-              'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          <Tooltip key={item.name}>
+            <TooltipTrigger asChild>
+              <Link
+                to={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  isCollapsed && 'justify-center px-2'
+                )}
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!isCollapsed && <span className="font-medium">{item.name}</span>}
+              </Link>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                {item.name}
+              </TooltipContent>
             )}
-          >
-            <item.icon className="h-5 w-5" />
-            <span className="font-medium">{item.name}</span>
-          </Link>
+          </Tooltip>
         );
       })}
-    </>
+    </TooltipProvider>
   );
 
   return (
@@ -151,17 +171,40 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <div className="lg:flex min-h-screen">
         {/* Sidebar */}
         {user && (
-          <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 border-r bg-card z-50">
-            <div className="flex flex-col h-full">
-              <div className="p-6 border-b">
-                <h2 className="text-2xl font-bold text-primary">Expense Manager</h2>
-                {userRole && (
-                  <p className="text-sm text-muted-foreground mt-1 capitalize">
-                    {userRole === 'treasurer' ? 'Admin' : userRole}
-                  </p>
+          <aside
+            className={cn(
+              "hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 border-r bg-card z-50 transition-all duration-300",
+              isCollapsed ? "lg:w-20" : "lg:w-64"
+            )}
+          >
+            <div className="flex flex-col h-full relative">
+              {/* Toggle Button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -right-3 top-6 h-6 w-6 rounded-full border bg-background shadow-md z-50 hidden lg:flex"
+                onClick={() => setIsCollapsed(!isCollapsed)}
+              >
+                {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+              </Button>
+
+              <div className={cn("p-6 border-b", isCollapsed && "p-4 flex justify-center")}>
+                {!isCollapsed ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-primary">Expense Manager</h2>
+                    {userRole && (
+                      <p className="text-sm text-muted-foreground mt-1 capitalize">
+                        {userRole === 'treasurer' ? 'Admin' : userRole}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="font-bold text-primary text-xl">EM</span>
+                  </div>
                 )}
               </div>
-              <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+              <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-hidden">
                 <NavLinks />
               </nav>
             </div>
@@ -169,7 +212,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* Main Content Wrapper */}
-        <div className={cn("flex-1 flex flex-col transition-all duration-300", user && "lg:pl-64")}>
+        <div className={cn(
+          "flex-1 flex flex-col transition-all duration-300",
+          user && (isCollapsed ? "lg:pl-20" : "lg:pl-64")
+        )}>
 
           {/* Desktop Header for Controls */}
           <header className="hidden lg:flex items-center justify-end gap-4 p-4 border-b bg-background/80 backdrop-blur-md sticky top-0 z-40">
