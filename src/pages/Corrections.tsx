@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, History, Edit, CheckCircle, Calendar, AlertCircle, Trash2 } from 'lucide-react';
+import { Loader2, History, Edit, CheckCircle, Calendar, AlertCircle, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -127,6 +127,8 @@ export default function Corrections() {
   const [bulkReason, setBulkReason] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [historicalType, setHistoricalType] = useState<'expenses' | 'income' | 'petty_cash' | 'cam'>('expenses');
+  const [expenseGroupBy, setExpenseGroupBy] = useState<string>('none');
+  const [incomeGroupBy, setIncomeGroupBy] = useState<string>('none');
 
   // Income Edit States
   const [selectedIncome, setSelectedIncome] = useState<Income | null>(null);
@@ -1187,94 +1189,121 @@ export default function Corrections() {
                         <p className="text-muted-foreground">No historical expenses found for the selected filters</p>
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            {userRole === 'accountant' && (
-                              <TableHead className="w-12">
-                                <Checkbox
-                                  checked={selectedHistorical.size === historicalExpenses.length}
-                                  onCheckedChange={handleSelectAll}
-                                />
-                              </TableHead>
-                            )}
-                            <TableHead>Date</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Budget Item</TableHead>
-                            <TableHead className="text-right">Base</TableHead>
-                            <TableHead className="text-right">GST</TableHead>
-                            <TableHead className="text-right">TDS</TableHead>
-                            <TableHead className="text-right">Net</TableHead>
-                            {userRole === 'treasurer' && (
-                              <TableHead className="text-center">Actions</TableHead>
-                            )}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {historicalExpenses.map((expense) => (
-                            <TableRow key={expense.id}>
-                              {userRole === 'accountant' && (
-                                <TableCell>
-                                  <Checkbox
-                                    checked={selectedHistorical.has(expense.id)}
-                                    onCheckedChange={(checked) =>
-                                      handleSelectHistorical(expense.id, checked as boolean)
-                                    }
-                                  />
-                                </TableCell>
-                              )}
-                              <TableCell className="text-sm">
-                                {new Date(expense.expense_date).toLocaleDateString('en-IN')}
-                              </TableCell>
-                              <TableCell className="text-sm">{expense.description}</TableCell>
-                              <TableCell className="text-sm">
-                                {expense.budget_master?.item_name || 'N/A'}
-                              </TableCell>
-                              <TableCell className="text-right text-sm">
-                                {formatCurrency(expense.amount)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm">
-                                {expense.gst_amount === 0 ? (
-                                  <Badge variant="destructive" className="text-xs">₹0</Badge>
-                                ) : (
-                                  formatCurrency(expense.gst_amount)
+                      <>
+                        <div className="flex justify-end mb-4 items-center gap-2">
+                          <Label htmlFor="expense-group-by" className="text-sm font-medium">Group By:</Label>
+                          <Select value={expenseGroupBy} onValueChange={setExpenseGroupBy}>
+                            <SelectTrigger id="expense-group-by" className="w-[180px]">
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="item">Budget Item</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {expenseGroupBy === 'item' ? (
+                          <HistoricalExpenseGroupedView
+                            data={historicalExpenses}
+                            groupBy={expenseGroupBy}
+                            formatCurrency={formatCurrency}
+                            selectedIds={selectedHistorical}
+                            toggleSelection={handleSelectHistorical}
+                            selectAll={handleSelectAll}
+                            onEdit={handleTreasurerEdit}
+                            isTreasurer={userRole === 'treasurer'}
+                          />
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                {userRole === 'accountant' && (
+                                  <TableHead className="w-12">
+                                    <Checkbox
+                                      checked={selectedHistorical.size === historicalExpenses.length}
+                                      onCheckedChange={handleSelectAll}
+                                    />
+                                  </TableHead>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-right text-sm">
-                                {expense.tds_amount === 0 ? (
-                                  <Badge variant="destructive" className="text-xs">₹0</Badge>
-                                ) : (
-                                  formatCurrency(expense.tds_amount || 0)
+                                <TableHead>Date</TableHead>
+                                <TableHead>Description</TableHead>
+                                <TableHead>Budget Item</TableHead>
+                                <TableHead className="text-right">Base</TableHead>
+                                <TableHead className="text-right">GST</TableHead>
+                                <TableHead className="text-right">TDS</TableHead>
+                                <TableHead className="text-right">Net</TableHead>
+                                {userRole === 'treasurer' && (
+                                  <TableHead className="text-center">Actions</TableHead>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-right text-sm font-medium">
-                                {formatCurrency(expense.amount + expense.gst_amount - (expense.tds_amount || 0))}
-                              </TableCell>
-                              {userRole === 'treasurer' && (
-                                <TableCell className="text-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleTreasurerEdit(expense)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDeleteClick(expense.id, 'expense', expense.description)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Delete
-                                  </Button>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {historicalExpenses.map((expense) => (
+                                <TableRow key={expense.id}>
+                                  {userRole === 'accountant' && (
+                                    <TableCell>
+                                      <Checkbox
+                                        checked={selectedHistorical.has(expense.id)}
+                                        onCheckedChange={(checked) =>
+                                          handleSelectHistorical(expense.id, checked as boolean)
+                                        }
+                                      />
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="text-sm">
+                                    {new Date(expense.expense_date).toLocaleDateString('en-IN')}
+                                  </TableCell>
+                                  <TableCell className="text-sm">{expense.description}</TableCell>
+                                  <TableCell className="text-sm">
+                                    {expense.budget_master?.item_name || 'N/A'}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {formatCurrency(expense.amount)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {expense.gst_amount === 0 ? (
+                                      <Badge variant="destructive" className="text-xs">₹0</Badge>
+                                    ) : (
+                                      formatCurrency(expense.gst_amount)
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {expense.tds_amount === 0 ? (
+                                      <Badge variant="destructive" className="text-xs">₹0</Badge>
+                                    ) : (
+                                      formatCurrency(expense.tds_amount || 0)
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-medium">
+                                    {formatCurrency(expense.amount + expense.gst_amount - (expense.tds_amount || 0))}
+                                  </TableCell>
+                                  {userRole === 'treasurer' && (
+                                    <TableCell className="text-center">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleTreasurerEdit(expense)}
+                                      >
+                                        <Edit className="h-4 w-4 mr-1" />
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => handleDeleteClick(expense.id, 'expense', expense.description)}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete
+                                      </Button>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </>
                     )
                   ) : historicalType === 'income' ? (
                     // Income Table
@@ -1284,74 +1313,98 @@ export default function Corrections() {
                         <p className="text-muted-foreground">No historical income found for the selected filters</p>
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Month</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Subcategory</TableHead>
-                            <TableHead>Notes</TableHead>
-                            <TableHead className="text-right">Base</TableHead>
-                            <TableHead className="text-right">GST</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                            {userRole === 'treasurer' && (
-                              <TableHead className="text-center">Actions</TableHead>
-                            )}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {historicalIncome.map((income) => (
-                            <TableRow key={income.id}>
-                              <TableCell className="text-sm font-medium">
-                                {MONTHS.find(m => m.value === income.month)?.label || income.month} {income.fiscal_year}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {income.income_categories?.category_name || 'N/A'}
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {income.income_categories?.subcategory_name || '-'}
-                              </TableCell>
-                              <TableCell className="text-sm max-w-[200px] truncate">
-                                {income.notes || '-'}
-                              </TableCell>
-                              <TableCell className="text-right text-sm">
-                                {formatCurrency(income.actual_amount)}
-                              </TableCell>
-                              <TableCell className="text-right text-sm">
-                                {income.gst_amount === 0 ? (
-                                  <Badge variant="destructive" className="text-xs">₹0</Badge>
-                                ) : (
-                                  formatCurrency(income.gst_amount)
+                      <>
+                        <div className="flex justify-end mb-4 items-center gap-2">
+                          <Label htmlFor="income-group-by" className="text-sm font-medium">Group By:</Label>
+                          <Select value={incomeGroupBy} onValueChange={setIncomeGroupBy}>
+                            <SelectTrigger id="income-group-by" className="w-[180px]">
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="category">Category</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {incomeGroupBy === 'category' ? (
+                          <HistoricalIncomeGroupedView
+                            data={historicalIncome}
+                            groupBy={incomeGroupBy}
+                            formatCurrency={formatCurrency}
+                            onEdit={handleTreasurerEditIncome}
+                            isTreasurer={userRole === 'treasurer'}
+                          />
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Month</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Subcategory</TableHead>
+                                <TableHead>Notes</TableHead>
+                                <TableHead className="text-right">Base</TableHead>
+                                <TableHead className="text-right">GST</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
+                                {userRole === 'treasurer' && (
+                                  <TableHead className="text-center">Actions</TableHead>
                                 )}
-                              </TableCell>
-                              <TableCell className="text-right text-sm font-medium">
-                                {formatCurrency(income.actual_amount + income.gst_amount)}
-                              </TableCell>
-                              {userRole === 'treasurer' && (
-                                <TableCell className="text-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleTreasurerEditIncome(income)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    onClick={() => handleDeleteClick(income.id, 'income', income.income_categories?.category_name || 'Income')}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Delete
-                                  </Button>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {historicalIncome.map((income) => (
+                                <TableRow key={income.id}>
+                                  <TableCell className="text-sm font-medium">
+                                    {MONTHS.find(m => m.value === income.month)?.label || income.month} {income.fiscal_year}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {income.income_categories?.category_name || 'N/A'}
+                                  </TableCell>
+                                  <TableCell className="text-sm">
+                                    {income.income_categories?.subcategory_name || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-sm max-w-[200px] truncate">
+                                    {income.notes || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {formatCurrency(income.actual_amount)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {income.gst_amount === 0 ? (
+                                      <Badge variant="destructive" className="text-xs">₹0</Badge>
+                                    ) : (
+                                      formatCurrency(income.gst_amount)
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-medium">
+                                    {formatCurrency(income.actual_amount + income.gst_amount)}
+                                  </TableCell>
+                                  {userRole === 'treasurer' && (
+                                    <TableCell className="text-center">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleTreasurerEditIncome(income)}
+                                      >
+                                        <Edit className="h-4 w-4 mr-1" />
+                                        Edit
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => handleDeleteClick(income.id, 'income', income.income_categories?.category_name || 'Income')}
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete
+                                      </Button>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </>
                     )
                   ) : historicalType === 'petty_cash' ? (
                     // Petty Cash Table
@@ -1991,5 +2044,206 @@ export default function Corrections() {
         </AlertDialogContent>
       </AlertDialog>
     </div >
+  );
+}
+
+function HistoricalExpenseGroupedView({
+  data,
+  groupBy,
+  formatCurrency,
+  selectedIds,
+  toggleSelection,
+  selectAll,
+  onEdit,
+  isTreasurer
+}: {
+  data: Expense[],
+  groupBy: string,
+  formatCurrency: (n: number) => string,
+  selectedIds: Set<string>,
+  toggleSelection: (id: string, checked: boolean) => void,
+  selectAll: () => void,
+  onEdit: (expense: Expense) => void,
+  isTreasurer: boolean
+}) {
+  const grouped = useMemo(() => {
+    const groups: Record<string, { items: Expense[], total: number }> = {};
+
+    data.forEach(row => {
+      let key = '';
+      switch (groupBy) {
+        case 'item': key = row.budget_master?.item_name || 'Unknown'; break;
+        default: key = 'All';
+      }
+
+      if (!groups[key]) {
+        groups[key] = { items: [], total: 0 };
+      }
+      groups[key].items.push(row);
+      groups[key].total += row.amount;
+    });
+
+    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+  }, [data, groupBy]);
+
+  return (
+    <div className="space-y-2">
+      {grouped.map(([key, { items, total }]) => (
+        <CollapsibleGroup
+          key={key}
+          title={key}
+          items={items}
+          total={total}
+          type="expense"
+          formatCurrency={formatCurrency}
+          selectedIds={selectedIds}
+          toggleSelection={toggleSelection}
+          selectAll={selectAll}
+          onEdit={onEdit}
+          isTreasurer={isTreasurer}
+        />
+      ))}
+    </div>
+  );
+}
+
+function HistoricalIncomeGroupedView({
+  data,
+  groupBy,
+  formatCurrency,
+  onEdit,
+  isTreasurer
+}: {
+  data: Income[],
+  groupBy: string,
+  formatCurrency: (n: number) => string,
+  onEdit: (income: Income) => void,
+  isTreasurer: boolean
+}) {
+  const grouped = useMemo(() => {
+    const groups: Record<string, { items: Income[], total: number }> = {};
+
+    data.forEach(row => {
+      let key = '';
+      switch (groupBy) {
+        case 'category': key = row.income_categories?.category_name || 'Unknown'; break;
+        default: key = 'All';
+      }
+
+      if (!groups[key]) {
+        groups[key] = { items: [], total: 0 };
+      }
+      groups[key].items.push(row);
+      groups[key].total += row.actual_amount;
+    });
+
+    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+  }, [data, groupBy]);
+
+  return (
+    <div className="space-y-2">
+      {grouped.map(([key, { items, total }]) => (
+        <CollapsibleGroup
+          key={key}
+          title={key}
+          items={items}
+          total={total}
+          type="income"
+          formatCurrency={formatCurrency}
+          selectedIds={new Set()}
+          toggleSelection={() => { }}
+          selectAll={() => { }}
+          onEdit={onEdit}
+          isTreasurer={isTreasurer}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CollapsibleGroup({
+  title,
+  items,
+  total,
+  type,
+  formatCurrency,
+  selectedIds,
+  toggleSelection,
+  selectAll,
+  onEdit,
+  isTreasurer
+}: any) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          <div>
+            <span className="font-medium text-sm block">{title}</span>
+            <span className="text-xs text-muted-foreground">{items.length} items</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <span className="font-semibold text-sm block">{formatCurrency(total)}</span>
+          <span className="text-xs text-muted-foreground">Total</span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="p-0 border-t bg-muted/10 animate-in slide-in-from-top-1 fade-in-0 duration-200">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {type === 'expense' && <TableHead className="w-[30px]"></TableHead>}
+                  <TableHead>Date</TableHead>
+                  <TableHead>{type === 'expense' ? 'Description' : 'Category'}</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  {isTreasurer && <TableHead className="text-center">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((row: any) => (
+                  <TableRow key={row.id}>
+                    {type === 'expense' && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(row.id)}
+                          onCheckedChange={(checked) => toggleSelection(row.id, checked as boolean)}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {type === 'expense' ? row.expense_date : `${row.month}/${row.fiscal_year}`}
+                    </TableCell>
+                    <TableCell className="text-xs max-w-[200px] truncate">
+                      {type === 'expense' ? row.description : (row.income_categories?.category_name || '-')}
+                    </TableCell>
+                    <TableCell className="text-xs text-right font-mono">
+                      {formatCurrency(type === 'expense' ? row.amount : row.actual_amount)}
+                    </TableCell>
+                    {isTreasurer && (
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(row)}
+                        >
+                          <Edit className="h-3 w-3 mr-1" /> Edit
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
