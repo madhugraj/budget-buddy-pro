@@ -21,6 +21,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 export function ExportExpenses() {
   const [loading, setLoading] = useState(false);
@@ -337,7 +348,10 @@ export function ExportExpenses() {
     const totalNet = selectedItems.reduce((sum, d) => sum + d.net_payment, 0);
     const avgNet = totalNet / count;
 
-    return { count, totalNet, avgNet };
+    const min = selectedItems.length > 0 ? Math.min(...selectedItems.map(d => d.net_payment)) : 0;
+    const max = selectedItems.length > 0 ? Math.max(...selectedItems.map(d => d.net_payment)) : 0;
+
+    return { count, totalNet, avgNet, min, max, items: selectedItems };
   }, [selectedIds, viewData]);
 
   return (
@@ -490,26 +504,7 @@ export function ExportExpenses() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            {selectedStats && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-blue-800">
-                    <Calculator className="h-4 w-4" />
-                    <span className="font-semibold text-sm">Selected Analysis ({selectedStats.count} items)</span>
-                  </div>
-                  <div className="flex gap-6 text-sm">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Total</span>
-                      <span className="font-bold text-blue-900">{formatCurrency(selectedStats.totalNet)}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Average</span>
-                      <span className="font-bold text-blue-900">{formatCurrency(selectedStats.avgNet)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {groupBy === 'none' ? (
               <div className="border rounded-lg overflow-hidden">
@@ -604,6 +599,76 @@ export function ExportExpenses() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {selectedStats && (
+        <Sheet modal={false}>
+          <SheetTrigger asChild>
+            <Button
+              className="fixed bottom-6 right-6 z-50 shadow-xl rounded-full h-14 px-6 gap-2"
+              size="lg"
+            >
+              <Calculator className="h-5 w-5" />
+              <span>Analysis ({selectedStats.count})</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="w-[400px] sm:w-[540px] pt-10">
+            <SheetHeader className="mb-6">
+              <SheetTitle className="flex items-center gap-2">
+                <Calculator className="h-5 w-5 text-primary" />
+                Statistical Analysis
+              </SheetTitle>
+              <SheetDescription>
+                detailed stats for {selectedStats.count} selected items.
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Sum</span>
+                <div className="text-2xl font-bold text-primary mt-1">{formatCurrency(selectedStats.totalNet)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Average</span>
+                <div className="text-2xl font-bold mt-1">{formatCurrency(selectedStats.avgNet)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Minimum</span>
+                <div className="text-xl font-semibold mt-1">{formatCurrency(selectedStats.min)}</div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50 border">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Maximum</span>
+                <div className="text-xl font-semibold mt-1">{formatCurrency(selectedStats.max)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold">Selected Items</h4>
+              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs text-muted-foreground" onClick={() => setSelectedIds(new Set())}>
+                Clear Selection
+              </Button>
+            </div>
+
+            <ScrollArea className="h-[40vh] border rounded-md p-2">
+              <Table>
+                <TableBody>
+                  {selectedStats.items.map((item: any) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="py-2 text-xs font-medium">{item.item_name}</TableCell>
+                      <TableCell className="py-2 text-right text-xs">{formatCurrency(item.net_payment)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+
+            <SheetFooter className="mt-6 sm:justify-between">
+              <span className="text-xs text-muted-foreground self-center">
+                Selected {selectedStats.count} of {viewData.length} items
+              </span>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
       )}
     </>
   );
