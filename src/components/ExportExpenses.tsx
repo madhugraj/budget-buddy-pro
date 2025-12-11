@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, ChevronDown } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, ChevronDown, ChevronRight, Calculator } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,7 @@ export function ExportExpenses() {
   const [viewData, setViewData] = useState<any[]>([]);
   const [showView, setShowView] = useState(false);
   const [groupBy, setGroupBy] = useState<string>('none');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const fetchExpenseData = async () => {
@@ -84,6 +86,7 @@ export function ExportExpenses() {
 
       // Transform data for view
       const transformedData = data.map((expense: any) => ({
+        id: expense.id,
         date: format(new Date(expense.expense_date), 'dd/MM/yyyy'),
         description: expense.description,
         category: expense.budget_master?.category || 'N/A',
@@ -101,6 +104,7 @@ export function ExportExpenses() {
 
       setViewData(transformedData);
       setShowView(true);
+      setSelectedIds(new Set()); // Reset selection on new view
 
       toast({
         title: 'Report loaded',
@@ -302,6 +306,40 @@ export function ExportExpenses() {
     }).format(amount);
   };
 
+  const toggleSelection = (id: string) => {
+    const newSelection = new Set(selectedIds);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedIds(newSelection);
+  };
+
+  const selectAll = (ids: string[]) => {
+    if (ids.every(id => selectedIds.has(id))) {
+      // Deselect all
+      const newSelection = new Set(selectedIds);
+      ids.forEach(id => newSelection.delete(id));
+      setSelectedIds(newSelection);
+    } else {
+      // Select all
+      const newSelection = new Set(selectedIds);
+      ids.forEach(id => newSelection.add(id));
+      setSelectedIds(newSelection);
+    }
+  };
+
+  const selectedStats = useMemo(() => {
+    if (selectedIds.size === 0) return null;
+    const selectedItems = viewData.filter(d => selectedIds.has(d.id));
+    const count = selectedItems.length;
+    const totalNet = selectedItems.reduce((sum, d) => sum + d.net_payment, 0);
+    const avgNet = totalNet / count;
+
+    return { count, totalNet, avgNet };
+  }, [selectedIds, viewData]);
+
   return (
     <>
       <Card>
@@ -394,7 +432,7 @@ export function ExportExpenses() {
               {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
               View
             </Button>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" disabled={loading}>
@@ -458,6 +496,12 @@ export function ExportExpenses() {
                   <Table>
                     <TableHeader className="sticky top-0 bg-muted z-10">
                       <TableRow>
+                        <TableHead className="w-[30px]">
+                          <Checkbox
+                            checked={viewData.length > 0 && viewData.every(d => selectedIds.has(d.id))}
+                            onCheckedChange={() => selectAll(viewData.map(d => d.id))}
+                          />
+                        </TableHead>
                         <TableHead className="text-xs">Date</TableHead>
                         <TableHead className="text-xs">Item</TableHead>
                         <TableHead className="text-xs text-right">Base</TableHead>
@@ -468,8 +512,14 @@ export function ExportExpenses() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {viewData.map((row, index) => (
-                        <TableRow key={index}>
+                      {viewData.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedIds.has(row.id)}
+                              onCheckedChange={() => toggleSelection(row.id)}
+                            />
+                          </TableCell>
                           <TableCell className="text-xs whitespace-nowrap">{row.date}</TableCell>
                           <TableCell className="text-xs font-medium max-w-[150px] truncate">{row.item_name}</TableCell>
                           <TableCell className="text-xs text-right">{formatCurrency(row.base_amount)}</TableCell>
@@ -493,7 +543,14 @@ export function ExportExpenses() {
                 </div>
               </div>
             ) : (
-              <GroupedAnalyticsView data={viewData} groupBy={groupBy} formatCurrency={formatCurrency} />
+              <GroupedAnalyticsView
+                data={viewData}
+                groupBy={groupBy}
+                formatCurrency={formatCurrency}
+                selectedIds={selectedIds}
+                toggleSelection={toggleSelection}
+                selectAll={selectAll}
+              />
             )}
 
             <div className="mt-3 p-3 bg-muted rounded-lg">
@@ -531,10 +588,24 @@ export function ExportExpenses() {
   );
 }
 
-function GroupedAnalyticsView({ data, groupBy, formatCurrency }: { data: any[], groupBy: string, formatCurrency: (n: number) => string }) {
+function GroupedAnalyticsView({
+  data,
+  groupBy,
+  formatCurrency,
+  selectedIds,
+  toggleSelection,
+  selectAll
+}: {
+  data: any[],
+  groupBy: string,
+  formatCurrency: (n: number) => string,
+  selectedIds: Set<string>,
+  toggleSelection: (id: string) => void,
+  selectAll: (ids: string[]) => void
+}) {
   const grouped = useMemo(() => {
     const groups: Record<string, { items: any[], totals: { base: number, gst: number, tds: number, net: number } }> = {};
-    
+
     data.forEach(row => {
       let key = '';
       switch (groupBy) {
@@ -544,7 +615,7 @@ function GroupedAnalyticsView({ data, groupBy, formatCurrency }: { data: any[], 
         case 'month': key = row.date?.substring(3, 10) || 'Unknown'; break; // MM/YYYY
         default: key = 'All';
       }
-      
+
       if (!groups[key]) {
         groups[key] = { items: [], totals: { base: 0, gst: 0, tds: 0, net: 0 } };
       }
@@ -554,29 +625,102 @@ function GroupedAnalyticsView({ data, groupBy, formatCurrency }: { data: any[], 
       groups[key].totals.tds += row.tds_amount;
       groups[key].totals.net += row.net_payment;
     });
-    
+
     return Object.entries(groups).sort((a, b) => b[1].totals.net - a[1].totals.net);
   }, [data, groupBy]);
 
   return (
     <div className="space-y-2">
       {grouped.map(([key, { items, totals }]) => (
-        <div key={key} className="border rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">{key}</span>
-              <span className="text-xs text-muted-foreground">({items.length} items)</span>
-            </div>
-            <span className="font-semibold text-sm">{formatCurrency(totals.net)}</span>
+        <CollapsibleGroup
+          key={key}
+          title={key}
+          items={items}
+          totals={totals}
+          formatCurrency={formatCurrency}
+          selectedIds={selectedIds}
+          toggleSelection={toggleSelection}
+          selectAll={selectAll}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CollapsibleGroup({
+  title,
+  items,
+  totals,
+  formatCurrency,
+  selectedIds,
+  toggleSelection,
+  selectAll
+}: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const allSelected = items.every((i: any) => selectedIds.has(i.id));
+
+  return (
+    <div className="border rounded-lg bg-card text-card-foreground shadow-sm">
+      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setIsOpen(!isOpen)}>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={() => selectAll(items.map((i: any) => i.id))}
+            />
           </div>
-          <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground">
-            <div>Base: {formatCurrency(totals.base)}</div>
-            <div>GST: {formatCurrency(totals.gst)}</div>
-            <div>TDS: {formatCurrency(totals.tds)}</div>
-            <div className="font-medium text-foreground">Net: {formatCurrency(totals.net)}</div>
+          <div>
+            <span className="font-medium text-sm block">{title}</span>
+            <span className="text-xs text-muted-foreground">{items.length} items</span>
           </div>
         </div>
-      ))}
+        <div className="text-right">
+          <span className="font-semibold text-sm block">{formatCurrency(totals.net)}</span>
+          <span className="text-xs text-muted-foreground">Net Total</span>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="p-0 border-t bg-muted/10 animate-in slide-in-from-top-1 fade-in-0 duration-200">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30px]"></TableHead>
+                  <TableHead className="text-xs">Date</TableHead>
+                  <TableHead className="text-xs">Item</TableHead>
+                  <TableHead className="text-xs text-right">Net</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((row: any) => (
+                  <TableRow key={row.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(row.id)}
+                        onCheckedChange={() => toggleSelection(row.id)}
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs">{row.date}</TableCell>
+                    <TableCell className="text-xs truncate max-w-[200px]">{row.item_name}</TableCell>
+                    <TableCell className="text-xs text-right font-mono">{formatCurrency(row.net_payment)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground p-2 px-3 border-t border-dashed bg-muted/20">
+        <div>Base: {formatCurrency(totals.base)}</div>
+        <div>GST: {formatCurrency(totals.gst)}</div>
+        <div>TDS: {formatCurrency(totals.tds)}</div>
+        <div className="font-medium text-foreground">Net: {formatCurrency(totals.net)}</div>
+      </div>
     </div>
   );
 }
