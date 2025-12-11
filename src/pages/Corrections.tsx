@@ -2067,7 +2067,7 @@ function HistoricalExpenseGroupedView({
   isTreasurer: boolean
 }) {
   const grouped = useMemo(() => {
-    const groups: Record<string, { items: Expense[], total: number }> = {};
+    const groups: Record<string, { items: Expense[], totals: { base: number, gst: number, tds: number, net: number } }> = {};
 
     data.forEach(row => {
       let key = '';
@@ -2077,23 +2077,26 @@ function HistoricalExpenseGroupedView({
       }
 
       if (!groups[key]) {
-        groups[key] = { items: [], total: 0 };
+        groups[key] = { items: [], totals: { base: 0, gst: 0, tds: 0, net: 0 } };
       }
       groups[key].items.push(row);
-      groups[key].total += row.amount;
+      groups[key].totals.base += row.amount;
+      groups[key].totals.gst += row.gst_amount;
+      groups[key].totals.tds += (row.tds_amount || 0);
+      groups[key].totals.net += (row.amount + row.gst_amount - (row.tds_amount || 0));
     });
 
-    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+    return Object.entries(groups).sort((a, b) => b[1].totals.net - a[1].totals.net);
   }, [data, groupBy]);
 
   return (
     <div className="space-y-2">
-      {grouped.map(([key, { items, total }]) => (
+      {grouped.map(([key, { items, totals }]) => (
         <CollapsibleGroup
           key={key}
           title={key}
           items={items}
-          total={total}
+          totals={totals}
           type="expense"
           formatCurrency={formatCurrency}
           selectedIds={selectedIds}
@@ -2121,7 +2124,7 @@ function HistoricalIncomeGroupedView({
   isTreasurer: boolean
 }) {
   const grouped = useMemo(() => {
-    const groups: Record<string, { items: Income[], total: number }> = {};
+    const groups: Record<string, { items: Income[], totals: { base: number, gst: number, net: number } }> = {};
 
     data.forEach(row => {
       let key = '';
@@ -2131,23 +2134,25 @@ function HistoricalIncomeGroupedView({
       }
 
       if (!groups[key]) {
-        groups[key] = { items: [], total: 0 };
+        groups[key] = { items: [], totals: { base: 0, gst: 0, net: 0 } };
       }
       groups[key].items.push(row);
-      groups[key].total += row.actual_amount;
+      groups[key].totals.base += row.actual_amount;
+      groups[key].totals.gst += row.gst_amount;
+      groups[key].totals.net += (row.actual_amount + row.gst_amount);
     });
 
-    return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+    return Object.entries(groups).sort((a, b) => b[1].totals.net - a[1].totals.net);
   }, [data, groupBy]);
 
   return (
     <div className="space-y-2">
-      {grouped.map(([key, { items, total }]) => (
+      {grouped.map(([key, { items, totals }]) => (
         <CollapsibleGroup
           key={key}
           title={key}
           items={items}
-          total={total}
+          totals={totals}
           type="income"
           formatCurrency={formatCurrency}
           selectedIds={new Set()}
@@ -2164,7 +2169,7 @@ function HistoricalIncomeGroupedView({
 function CollapsibleGroup({
   title,
   items,
-  total,
+  totals,
   type,
   formatCurrency,
   selectedIds,
@@ -2188,8 +2193,8 @@ function CollapsibleGroup({
           </div>
         </div>
         <div className="text-right">
-          <span className="font-semibold text-sm block">{formatCurrency(total)}</span>
-          <span className="text-xs text-muted-foreground">Total</span>
+          <span className="font-semibold text-sm block">{formatCurrency(totals.net)}</span>
+          <span className="text-xs text-muted-foreground">Net Total</span>
         </div>
       </div>
 
@@ -2202,7 +2207,10 @@ function CollapsibleGroup({
                   {type === 'expense' && <TableHead className="w-[30px]"></TableHead>}
                   <TableHead>Date</TableHead>
                   <TableHead>{type === 'expense' ? 'Description' : 'Category'}</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Base</TableHead>
+                  <TableHead className="text-right">GST</TableHead>
+                  {type === 'expense' && <TableHead className="text-right">TDS</TableHead>}
+                  <TableHead className="text-right">Net</TableHead>
                   {isTreasurer && <TableHead className="text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -2223,9 +2231,27 @@ function CollapsibleGroup({
                     <TableCell className="text-xs max-w-[200px] truncate">
                       {type === 'expense' ? row.description : (row.income_categories?.category_name || '-')}
                     </TableCell>
-                    <TableCell className="text-xs text-right font-mono">
+
+                    {/* Amounts with proper GST/TDS split */}
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">
                       {formatCurrency(type === 'expense' ? row.amount : row.actual_amount)}
                     </TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">
+                      {formatCurrency(row.gst_amount)}
+                    </TableCell>
+                    {type === 'expense' && (
+                      <TableCell className="text-xs text-right font-mono text-muted-foreground">
+                        {formatCurrency(row.tds_amount || 0)}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-xs text-right font-mono font-medium">
+                      {formatCurrency(
+                        type === 'expense'
+                          ? row.amount + row.gst_amount - (row.tds_amount || 0)
+                          : row.actual_amount + row.gst_amount
+                      )}
+                    </TableCell>
+
                     {isTreasurer && (
                       <TableCell className="text-center">
                         <Button
@@ -2244,6 +2270,14 @@ function CollapsibleGroup({
           </div>
         </div>
       )}
+
+      {/* Summary Footer for Group */}
+      <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground p-2 px-3 border-t border-dashed bg-muted/20">
+        <div>Base: {formatCurrency(totals.base)}</div>
+        <div>GST: {formatCurrency(totals.gst)}</div>
+        {type === 'expense' && <div>TDS: {formatCurrency(totals.tds)}</div>}
+        <div className="font-medium text-foreground">Net: {formatCurrency(totals.net)}</div>
+      </div>
     </div>
   );
 }
