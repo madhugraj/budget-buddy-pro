@@ -490,6 +490,27 @@ export function ExportExpenses() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
+            {selectedStats && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-in fade-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-blue-800">
+                    <Calculator className="h-4 w-4" />
+                    <span className="font-semibold text-sm">Selected Analysis ({selectedStats.count} items)</span>
+                  </div>
+                  <div className="flex gap-6 text-sm">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Total</span>
+                      <span className="font-bold text-blue-900">{formatCurrency(selectedStats.totalNet)}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] uppercase tracking-wider text-blue-600 font-semibold">Average</span>
+                      <span className="font-bold text-blue-900">{formatCurrency(selectedStats.avgNet)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {groupBy === 'none' ? (
               <div className="border rounded-lg overflow-hidden">
                 <div className="max-h-[400px] overflow-y-auto">
