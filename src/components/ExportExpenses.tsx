@@ -612,69 +612,79 @@ export function ExportExpenses() {
               <span>Analysis ({selectedStats.count})</span>
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-[400px] sm:w-[540px] pt-10">
-            <SheetHeader className="mb-6">
-              <SheetTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-primary" />
-                Statistical Analysis
-              </SheetTitle>
-              <SheetDescription>
-                detailed stats for {selectedStats.count} selected items.
-              </SheetDescription>
-            </SheetHeader>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-4 rounded-lg bg-muted/50 border col-span-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Sum</span>
-                <div className="text-2xl font-bold text-primary mt-1 break-words">{formatCurrency(selectedStats.totalNet)}</div>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50 border col-span-2">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Average</span>
-                <div className="text-2xl font-bold mt-1 break-words">{formatCurrency(selectedStats.avgNet)}</div>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50 border">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Minimum</span>
-                <div className="text-lg font-semibold mt-1 break-words">{formatCurrency(selectedStats.min)}</div>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50 border">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Maximum</span>
-                <div className="text-lg font-semibold mt-1 break-words">{formatCurrency(selectedStats.max)}</div>
+          <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
+            <div className="p-6 pt-12 pb-4 border-b bg-card z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <SheetTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5 text-primary" />
+                    Analysis View
+                  </SheetTitle>
+                  <SheetDescription>
+                    Reviewing {selectedStats.count} selected records
+                  </SheetDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive h-8 px-2 lg:px-3"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear Selection
+                </Button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold">Selected Items</h4>
-              <Button variant="ghost" size="sm" className="h-auto py-1 px-2 text-xs text-muted-foreground" onClick={() => setSelectedIds(new Set())}>
-                Clear Selection
-              </Button>
+            <div className="flex-1 overflow-hidden relative bg-muted/5">
+              <ScrollArea className="h-full w-full">
+                <div className="p-4 px-6">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-none">
+                        <TableHead className="w-[50px] text-xs font-semibold h-8 text-primary">#</TableHead>
+                        <TableHead className="text-xs font-semibold h-8 text-primary">Item Description</TableHead>
+                        <TableHead className="text-xs font-semibold h-8 text-right text-primary">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedStats.items.map((item: any, index: number) => (
+                        <TableRow key={item.id} className="hover:bg-muted/50 border-b border-muted/50">
+                          <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="py-2 text-xs font-medium text-foreground/90">{item.item_name}</TableCell>
+                          <TableCell className="py-2 text-right text-xs font-mono">{formatCurrency(item.net_payment)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </ScrollArea>
             </div>
 
-            <ScrollArea className="h-[40vh] border rounded-md p-2">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px] text-xs h-8">S.No</TableHead>
-                    <TableHead className="text-xs h-8">Item</TableHead>
-                    <TableHead className="text-xs text-right h-8">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedStats.items.map((item: any, index: number) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="py-2 text-xs font-medium">{item.item_name}</TableCell>
-                      <TableCell className="py-2 text-right text-xs">{formatCurrency(item.net_payment)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+            <div className="bg-background border-t p-4 pb-8 space-y-4 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-20">
+              <div className="grid grid-cols-4 gap-2 text-center divide-x divide-muted-foreground/20">
+                <div className="px-1">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Count</p>
+                  <p className="text-lg font-medium text-foreground leading-tight">{selectedStats.count}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Avg</p>
+                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.avgNet)}>{formatCurrency(selectedStats.avgNet)}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Min</p>
+                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.min)}>{formatCurrency(selectedStats.min)}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Max</p>
+                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.max)}>{formatCurrency(selectedStats.max)}</p>
+                </div>
+              </div>
 
-            <SheetFooter className="mt-6 sm:justify-between">
-              <span className="text-xs text-muted-foreground self-center">
-                Selected {selectedStats.count} of {viewData.length} items
-              </span>
-            </SheetFooter>
+              <div className="bg-primary space-x-4 rounded-lg p-4 shadow-lg shadow-primary/20 flex items-center justify-between text-primary-foreground">
+                <span className="text-sm font-medium uppercase tracking-wide opacity-90">Total Sum</span>
+                <span className="text-2xl font-bold tracking-tight">{formatCurrency(selectedStats.totalNet)}</span>
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       )}
