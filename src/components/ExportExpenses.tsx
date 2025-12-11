@@ -660,29 +660,29 @@ export function ExportExpenses() {
               </ScrollArea>
             </div>
 
-            <div className="bg-background border-t p-4 pb-8 space-y-4 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-20">
-              <div className="grid grid-cols-4 gap-2 text-center divide-x divide-muted-foreground/20">
-                <div className="px-1">
-                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Count</p>
-                  <p className="text-lg font-medium text-foreground leading-tight">{selectedStats.count}</p>
+            <div className="bg-background border-t p-4 pb-6 space-y-3 shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] z-20">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="text-center p-2 rounded-md bg-muted/30">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider mb-1">Count</p>
+                  <p className="text-xl font-bold text-foreground">{selectedStats.count}</p>
                 </div>
-                <div className="px-1">
-                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Avg</p>
-                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.avgNet)}>{formatCurrency(selectedStats.avgNet)}</p>
+                <div className="text-center p-2 rounded-md bg-muted/30">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider mb-1">Average</p>
+                  <p className="text-xs sm:text-sm font-semibold text-foreground break-words" title={formatCurrency(selectedStats.avgNet)}>{formatCurrency(selectedStats.avgNet)}</p>
                 </div>
-                <div className="px-1">
-                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Min</p>
-                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.min)}>{formatCurrency(selectedStats.min)}</p>
+                <div className="text-center p-2 rounded-md bg-muted/30">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider mb-1">Minimum</p>
+                  <p className="text-xs sm:text-sm font-semibold text-foreground break-words" title={formatCurrency(selectedStats.min)}>{formatCurrency(selectedStats.min)}</p>
                 </div>
-                <div className="px-1">
-                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider">Max</p>
-                  <p className="text-sm font-medium text-foreground leading-tight mt-1 truncate" title={formatCurrency(selectedStats.max)}>{formatCurrency(selectedStats.max)}</p>
+                <div className="text-center p-2 rounded-md bg-muted/30">
+                  <p className="text-[10px] uppercase text-muted-foreground font-semibold tracking-wider mb-1">Maximum</p>
+                  <p className="text-xs sm:text-sm font-semibold text-foreground break-words" title={formatCurrency(selectedStats.max)}>{formatCurrency(selectedStats.max)}</p>
                 </div>
               </div>
 
-              <div className="bg-primary space-x-4 rounded-lg p-4 shadow-lg shadow-primary/20 flex items-center justify-between text-primary-foreground">
-                <span className="text-sm font-medium uppercase tracking-wide opacity-90">Total Sum</span>
-                <span className="text-2xl font-bold tracking-tight">{formatCurrency(selectedStats.totalNet)}</span>
+              <div className="bg-primary rounded-lg p-3 shadow-lg shadow-primary/20 flex items-center justify-between text-primary-foreground">
+                <span className="text-xs sm:text-sm font-medium uppercase tracking-wide opacity-90">Total Sum</span>
+                <span className="text-lg sm:text-2xl font-bold tracking-tight break-words">{formatCurrency(selectedStats.totalNet)}</span>
               </div>
             </div>
           </SheetContent>
