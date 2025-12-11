@@ -96,9 +96,14 @@ export default function CAMTracking() {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState(() => {
-    return urlTab || 'tower-entry';
-  });
+  const [activeTab, setActiveTab] = useState(urlTab || 'tower-entry');
+
+  // Update activeTab when URL param changes (for navigation from notifications)
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
   const [selectedYear, setSelectedYear] = useState(() => {
     return urlYear ? parseInt(urlYear) : new Date().getFullYear();
   });
@@ -1194,7 +1199,7 @@ function QuarterlySummary() {
 }
 
 function DiscrepancyReport() {
-  const { user, userRole } = useAuth();
+  const { user, userRole, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -1313,7 +1318,7 @@ function DiscrepancyReport() {
     window.location.href = `/cam-tracking?tower=${item.tower}&quarter=${item.quarterValue}&year=${selectedYear}`;
   };
 
-  if (loading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
+  if (loading || authLoading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
 
   return (
     <Card>
