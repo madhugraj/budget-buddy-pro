@@ -664,6 +664,7 @@ export function ExportIncome() {
                                         <TableHeader>
                                             <TableRow className="hover:bg-transparent border-none">
                                                 <TableHead className="w-[50px] text-xs font-semibold h-8 text-primary">#</TableHead>
+                                                <TableHead className="text-xs font-semibold h-8 text-primary">Month</TableHead>
                                                 <TableHead className="text-xs font-semibold h-8 text-primary">Category</TableHead>
                                                 <TableHead className="text-xs font-semibold h-8 text-right text-primary">Amount</TableHead>
                                             </TableRow>
@@ -672,6 +673,7 @@ export function ExportIncome() {
                                             {selectedStats.items.map((item: any, index: number) => (
                                                 <TableRow key={index} className="hover:bg-muted/50 border-b border-muted/50">
                                                     <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
+                                                    <TableCell className="py-2 text-xs text-muted-foreground">{item.month_name}</TableCell>
                                                     <TableCell className="py-2 text-xs font-medium text-foreground/90">{item.category}</TableCell>
                                                     <TableCell className="py-2 text-right text-xs font-mono">{formatCurrency(item.total_amount)}</TableCell>
                                                 </TableRow>
