@@ -624,21 +624,21 @@ export function ExportExpenses() {
             </SheetHeader>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-4 rounded-lg bg-muted/50 border">
+              <div className="p-4 rounded-lg bg-muted/50 border col-span-2">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Sum</span>
-                <div className="text-2xl font-bold text-primary mt-1">{formatCurrency(selectedStats.totalNet)}</div>
+                <div className="text-2xl font-bold text-primary mt-1 break-words">{formatCurrency(selectedStats.totalNet)}</div>
               </div>
-              <div className="p-4 rounded-lg bg-muted/50 border">
+              <div className="p-4 rounded-lg bg-muted/50 border col-span-2">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Average</span>
-                <div className="text-2xl font-bold mt-1">{formatCurrency(selectedStats.avgNet)}</div>
+                <div className="text-2xl font-bold mt-1 break-words">{formatCurrency(selectedStats.avgNet)}</div>
               </div>
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Minimum</span>
-                <div className="text-xl font-semibold mt-1">{formatCurrency(selectedStats.min)}</div>
+                <div className="text-lg font-semibold mt-1 break-words">{formatCurrency(selectedStats.min)}</div>
               </div>
               <div className="p-4 rounded-lg bg-muted/50 border">
                 <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Maximum</span>
-                <div className="text-xl font-semibold mt-1">{formatCurrency(selectedStats.max)}</div>
+                <div className="text-lg font-semibold mt-1 break-words">{formatCurrency(selectedStats.max)}</div>
               </div>
             </div>
 
@@ -651,9 +651,17 @@ export function ExportExpenses() {
 
             <ScrollArea className="h-[40vh] border rounded-md p-2">
               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px] text-xs h-8">S.No</TableHead>
+                    <TableHead className="text-xs h-8">Item</TableHead>
+                    <TableHead className="text-xs text-right h-8">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {selectedStats.items.map((item: any) => (
+                  {selectedStats.items.map((item: any, index: number) => (
                     <TableRow key={item.id}>
+                      <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
                       <TableCell className="py-2 text-xs font-medium">{item.item_name}</TableCell>
                       <TableCell className="py-2 text-right text-xs">{formatCurrency(item.net_payment)}</TableCell>
                     </TableRow>
