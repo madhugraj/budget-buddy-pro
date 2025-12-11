@@ -818,6 +818,8 @@ function CollapsibleGroup({
                                     <TableHead className="w-[30px]"></TableHead>
                                     <TableHead className="text-xs">Month</TableHead>
                                     <TableHead className="text-xs">Category</TableHead>
+                                    <TableHead className="text-xs text-right">Base</TableHead>
+                                    <TableHead className="text-xs text-right">GST</TableHead>
                                     <TableHead className="text-xs text-right">Total</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -832,7 +834,9 @@ function CollapsibleGroup({
                                         </TableCell>
                                         <TableCell className="text-xs">{row.month_name}</TableCell>
                                         <TableCell className="text-xs truncate max-w-[200px]">{row.category}</TableCell>
-                                        <TableCell className="text-xs text-right font-mono">{formatCurrency(row.total_amount)}</TableCell>
+                                        <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.base_amount)}</TableCell>
+                                        <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.gst_amount)}</TableCell>
+                                        <TableCell className="text-xs text-right font-mono font-medium">{formatCurrency(row.total_amount)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

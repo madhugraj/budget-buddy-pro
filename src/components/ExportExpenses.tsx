@@ -798,6 +798,9 @@ function CollapsibleGroup({
                   <TableHead className="w-[30px]"></TableHead>
                   <TableHead className="text-xs">Date</TableHead>
                   <TableHead className="text-xs">Item</TableHead>
+                  <TableHead className="text-xs text-right">Base</TableHead>
+                  <TableHead className="text-xs text-right">GST</TableHead>
+                  <TableHead className="text-xs text-right">TDS</TableHead>
                   <TableHead className="text-xs text-right">Net</TableHead>
                 </TableRow>
               </TableHeader>
@@ -810,9 +813,12 @@ function CollapsibleGroup({
                         onCheckedChange={() => toggleSelection(row.id)}
                       />
                     </TableCell>
-                    <TableCell className="text-xs">{row.date}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">{row.date}</TableCell>
                     <TableCell className="text-xs truncate max-w-[200px]">{row.item_name}</TableCell>
-                    <TableCell className="text-xs text-right font-mono">{formatCurrency(row.net_payment)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.base_amount)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.gst_amount)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.tds_amount)}</TableCell>
+                    <TableCell className="text-xs text-right font-mono font-medium">{formatCurrency(row.net_payment)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
