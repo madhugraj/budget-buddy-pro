@@ -550,6 +550,7 @@ export function ExportIncome() {
                                                 </TableHead>
                                                 <TableHead className="text-xs">Month</TableHead>
                                                 <TableHead className="text-xs">Category</TableHead>
+                                                <TableHead className="text-xs">Subcategory</TableHead>
                                                 <TableHead className="text-xs text-right">Base</TableHead>
                                                 <TableHead className="text-xs text-right">GST</TableHead>
                                                 <TableHead className="text-xs text-right">Total</TableHead>
@@ -567,6 +568,7 @@ export function ExportIncome() {
                                                     </TableCell>
                                                     <TableCell className="text-xs whitespace-nowrap">{row.month_name}</TableCell>
                                                     <TableCell className="text-xs font-medium max-w-[150px] truncate">{row.category}</TableCell>
+                                                    <TableCell className="text-xs max-w-[150px] truncate text-muted-foreground">{row.subcategory}</TableCell>
                                                     <TableCell className="text-xs text-right">{formatCurrency(row.base_amount)}</TableCell>
                                                     <TableCell className="text-xs text-right">{formatCurrency(row.gst_amount)}</TableCell>
                                                     <TableCell className="text-xs text-right font-medium">{formatCurrency(row.total_amount)}</TableCell>
@@ -666,6 +668,7 @@ export function ExportIncome() {
                                                 <TableHead className="w-[50px] text-xs font-semibold h-8 text-primary">#</TableHead>
                                                 <TableHead className="text-xs font-semibold h-8 text-primary">Month</TableHead>
                                                 <TableHead className="text-xs font-semibold h-8 text-primary">Category</TableHead>
+                                                <TableHead className="text-xs font-semibold h-8 text-primary">Subcategory</TableHead>
                                                 <TableHead className="text-xs font-semibold h-8 text-right text-primary">Amount</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -675,6 +678,7 @@ export function ExportIncome() {
                                                     <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
                                                     <TableCell className="py-2 text-xs text-muted-foreground">{item.month_name}</TableCell>
                                                     <TableCell className="py-2 text-xs font-medium text-foreground/90">{item.category}</TableCell>
+                                                    <TableCell className="py-2 text-xs text-muted-foreground">{item.subcategory}</TableCell>
                                                     <TableCell className="py-2 text-right text-xs font-mono">{formatCurrency(item.total_amount)}</TableCell>
                                                 </TableRow>
                                             ))}
@@ -818,6 +822,7 @@ function CollapsibleGroup({
                                     <TableHead className="w-[30px]"></TableHead>
                                     <TableHead className="text-xs">Month</TableHead>
                                     <TableHead className="text-xs">Category</TableHead>
+                                    <TableHead className="text-xs">Subcategory</TableHead>
                                     <TableHead className="text-xs text-right">Base</TableHead>
                                     <TableHead className="text-xs text-right">GST</TableHead>
                                     <TableHead className="text-xs text-right">Total</TableHead>
@@ -834,6 +839,7 @@ function CollapsibleGroup({
                                         </TableCell>
                                         <TableCell className="text-xs">{row.month_name}</TableCell>
                                         <TableCell className="text-xs truncate max-w-[200px]">{row.category}</TableCell>
+                                        <TableCell className="text-xs truncate max-w-[200px] text-muted-foreground">{row.subcategory}</TableCell>
                                         <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.base_amount)}</TableCell>
                                         <TableCell className="text-xs text-right font-mono text-muted-foreground">{formatCurrency(row.gst_amount)}</TableCell>
                                         <TableCell className="text-xs text-right font-mono font-medium">{formatCurrency(row.total_amount)}</TableCell>
