@@ -95,8 +95,9 @@ export function LeadNotificationBell() {
   const handleNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
     
-    if (notification.type === 'cam_reminder') {
-      navigate('/cam-tracking');
+    if (notification.type === 'cam_reminder' || notification.type === 'data_discrepancy') {
+      // Navigate to CAM Tracking with discrepancy tab selected
+      navigate('/cam-tracking?tab=discrepancies');
     }
     setIsOpen(false);
   };

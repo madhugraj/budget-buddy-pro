@@ -92,9 +92,13 @@ export default function CAMTracking() {
   const urlTower = searchParams.get('tower');
   const urlQuarter = searchParams.get('quarter');
   const urlYear = searchParams.get('year');
+  const urlTab = searchParams.get('tab');
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => {
+    return urlTab || 'tower-entry';
+  });
   const [selectedYear, setSelectedYear] = useState(() => {
     return urlYear ? parseInt(urlYear) : new Date().getFullYear();
   });
@@ -112,11 +116,13 @@ export default function CAMTracking() {
   const [draftRecords, setDraftRecords] = useState<CAMDataFromDB[]>([]);
   const [selectedDrafts, setSelectedDrafts] = useState<Set<string>>(new Set());
   const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [discrepancyCount, setDiscrepancyCount] = useState(0);
 
   const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
 
   useEffect(() => {
     fetchUserRole();
+    fetchDiscrepancyCount();
   }, [user]);
 
   useEffect(() => {
@@ -125,6 +131,42 @@ export default function CAMTracking() {
       loadDraftRecords();
     }
   }, [selectedYear, selectedQuarter, userRole]);
+
+  const fetchDiscrepancyCount = async () => {
+    try {
+      const currentYear = new Date().getFullYear();
+      const { data, error } = await supabase
+        .from('cam_tracking')
+        .select('*')
+        .or(`and(year.eq.${currentYear},month.gte.4),and(year.eq.${currentYear + 1},month.lte.3)`);
+
+      if (error) throw error;
+      const records = data as CAMDataFromDB[];
+      let count = 0;
+
+      TOWERS.forEach(tower => {
+        FISCAL_QUARTERS.forEach(quarter => {
+          const qMonths = quarter.months;
+          const towerQData = records.filter(r => r.tower === tower && qMonths.includes(r.month || 0));
+          towerQData.sort((a, b) => qMonths.indexOf(a.month || 0) - qMonths.indexOf(b.month || 0));
+
+          if (towerQData.length < 2) return;
+
+          let previousPending = -1;
+          towerQData.forEach(record => {
+            if (previousPending !== -1 && record.pending_flats > previousPending) {
+              count++;
+            }
+            previousPending = record.pending_flats;
+          });
+        });
+      });
+
+      setDiscrepancyCount(count);
+    } catch (error) {
+      console.error('Error fetching discrepancy count:', error);
+    }
+  };
 
   const fetchUserRole = async () => {
     if (!user) return;
@@ -584,11 +626,13 @@ export default function CAMTracking() {
         </div>
       </div>
 
-      <Tabs defaultValue="tower-entry" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="tower-entry">Tower-wise Entry</TabsTrigger>
           <TabsTrigger value="overview">All Towers Overview</TabsTrigger>
-          <TabsTrigger value="discrepancies">Discrepancy Check</TabsTrigger>
+          <TabsTrigger value="discrepancies">
+            Discrepancy Check {discrepancyCount > 0 && `(${discrepancyCount})`}
+          </TabsTrigger>
           <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
           {userRole === 'lead' && (
             <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>
@@ -1150,25 +1194,11 @@ function QuarterlySummary() {
 }
 
 function DiscrepancyReport() {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [sendingAlert, setSendingAlert] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchRole = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-      setUserRole(data?.role || null);
-    };
-    fetchRole();
-  }, [user]);
 
   // Logic to identify impossible scenarios:
   // 1. Pending count increasing within a quarter (e.g. Apr: 5, May: 7) - Impossible unless invoice generated mid-quarter?
