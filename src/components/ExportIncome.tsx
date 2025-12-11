@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,12 +8,18 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, FileDown, BarChart3 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, CalendarIcon, Eye, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function ExportIncome() {
     const [loading, setLoading] = useState(false);
@@ -22,6 +28,7 @@ export function ExportIncome() {
     const [dateTo, setDateTo] = useState<Date | undefined>();
     const [viewData, setViewData] = useState<any[]>([]);
     const [showView, setShowView] = useState(false);
+    const [groupBy, setGroupBy] = useState<string>('none');
     const { toast } = useToast();
 
     const fetchIncomeData = async () => {
@@ -412,146 +419,132 @@ export function ExportIncome() {
                         </div>
                     </div>
 
-                    <div className="flex gap-3 flex-wrap">
+                    <div className="flex gap-2 items-center">
                         <Button
                             onClick={handleView}
                             disabled={loading}
-                            variant="secondary"
-                            className="flex-1 min-w-[200px]"
-                        >
-                            {loading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <Eye className="mr-2 h-4 w-4" />
-                            )}
-                            View Report
-                        </Button>
-                        <Button
-                            onClick={handleExportPDF}
-                            disabled={loading}
-                            variant="outline"
-                            className="flex-1 min-w-[200px]"
-                        >
-                            {loading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <FileDown className="mr-2 h-4 w-4" />
-                            )}
-                            Export to PDF
-                        </Button>
-                    </div>
-
-                    <div className="flex gap-3 flex-wrap">
-                        <Button
-                            onClick={handleExportSummaryPDF}
-                            disabled={loading}
+                            size="sm"
                             variant="default"
-                            className="flex-1 min-w-[200px]"
                         >
-                            {loading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <BarChart3 className="mr-2 h-4 w-4" />
-                            )}
-                            Export Summary PDF
+                            {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+                            View
                         </Button>
-                        <Button
-                            onClick={() => handleExport('excel')}
-                            disabled={loading}
-                            className="flex-1 min-w-[200px]"
-                        >
-                            {loading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                            )}
-                            Export to Excel
-                        </Button>
-                        <Button
-                            onClick={() => handleExport('csv')}
-                            disabled={loading}
-                            variant="outline"
-                            className="flex-1 min-w-[200px]"
-                        >
-                            {loading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <FileText className="mr-2 h-4 w-4" />
-                            )}
-                            Export to CSV
-                        </Button>
+                        
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={loading}>
+                                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                                    Export
+                                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleExportPDF}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    PDF (Detailed)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleExportSummaryPDF}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    PDF (Summary)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('excel')}>
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                    Excel
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    CSV
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </CardContent>
             </Card>
 
             {showView && viewData.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Income Report ({viewData.length} entries)</CardTitle>
-                        <CardDescription>
-                            Filtered results based on your criteria
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="border rounded-lg overflow-hidden">
-                            <div className="max-h-[600px] overflow-y-auto">
-                                <Table>
-                                    <TableHeader className="sticky top-0 bg-muted z-10">
-                                        <TableRow>
-                                            <TableHead>Month</TableHead>
-                                            <TableHead>Category</TableHead>
-                                            <TableHead>Subcategory</TableHead>
-                                            <TableHead className="text-right">Base</TableHead>
-                                            <TableHead className="text-right">GST</TableHead>
-                                            <TableHead className="text-right">Total</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Recorded By</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {viewData.map((row, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell className="whitespace-nowrap">{row.month_name}</TableCell>
-                                                <TableCell className="font-medium">{row.category}</TableCell>
-                                                <TableCell>{row.subcategory}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(row.base_amount)}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(row.gst_amount)}</TableCell>
-                                                <TableCell className="text-right font-bold">{formatCurrency(row.total_amount)}</TableCell>
-                                                <TableCell>
-                                                    <span className={cn(
-                                                        "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium",
-                                                        row.status === 'approved' && "bg-green-100 text-green-700",
-                                                        row.status === 'pending' && "bg-yellow-100 text-yellow-700",
-                                                        row.status === 'rejected' && "bg-red-100 text-red-700"
-                                                    )}>
-                                                        {row.status}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>{row.recorded_by}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                <Card className="mt-4">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-base">Income Report ({viewData.length} entries)</CardTitle>
+                                <CardDescription className="text-xs">Filtered results</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label className="text-xs text-muted-foreground">Group by:</Label>
+                                <Select value={groupBy} onValueChange={setGroupBy}>
+                                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="category">Category</SelectItem>
+                                        <SelectItem value="month">Month</SelectItem>
+                                        <SelectItem value="status">Status</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        {groupBy === 'none' ? (
+                            <div className="border rounded-lg overflow-hidden">
+                                <div className="max-h-[400px] overflow-y-auto">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-muted z-10">
+                                            <TableRow>
+                                                <TableHead className="text-xs">Month</TableHead>
+                                                <TableHead className="text-xs">Category</TableHead>
+                                                <TableHead className="text-xs text-right">Base</TableHead>
+                                                <TableHead className="text-xs text-right">GST</TableHead>
+                                                <TableHead className="text-xs text-right">Total</TableHead>
+                                                <TableHead className="text-xs">Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {viewData.map((row, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell className="text-xs whitespace-nowrap">{row.month_name}</TableCell>
+                                                    <TableCell className="text-xs font-medium max-w-[150px] truncate">{row.category}</TableCell>
+                                                    <TableCell className="text-xs text-right">{formatCurrency(row.base_amount)}</TableCell>
+                                                    <TableCell className="text-xs text-right">{formatCurrency(row.gst_amount)}</TableCell>
+                                                    <TableCell className="text-xs text-right font-medium">{formatCurrency(row.total_amount)}</TableCell>
+                                                    <TableCell>
+                                                        <span className={cn(
+                                                            "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium",
+                                                            row.status === 'approved' && "bg-green-100 text-green-700",
+                                                            row.status === 'pending' && "bg-yellow-100 text-yellow-700",
+                                                            row.status === 'rejected' && "bg-red-100 text-red-700"
+                                                        )}>
+                                                            {row.status}
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        ) : (
+                            <IncomeGroupedView data={viewData} groupBy={groupBy} formatCurrency={formatCurrency} />
+                        )}
 
-                        <div className="mt-4 p-4 bg-muted rounded-lg">
-                            <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div className="mt-3 p-3 bg-muted rounded-lg">
+                            <div className="grid grid-cols-3 gap-3 text-xs">
                                 <div>
                                     <p className="text-muted-foreground">Total Base</p>
-                                    <p className="text-lg font-semibold">
+                                    <p className="text-sm font-semibold">
                                         {formatCurrency(viewData.reduce((sum, row) => sum + row.base_amount, 0))}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-muted-foreground">Total GST</p>
-                                    <p className="text-lg font-semibold">
+                                    <p className="text-sm font-semibold">
                                         {formatCurrency(viewData.reduce((sum, row) => sum + row.gst_amount, 0))}
                                     </p>
                                 </div>
                                 <div>
                                     <p className="text-muted-foreground">Total Amount</p>
-                                    <p className="text-lg font-bold text-primary">
+                                    <p className="text-sm font-bold text-primary">
                                         {formatCurrency(viewData.reduce((sum, row) => sum + row.total_amount, 0))}
                                     </p>
                                 </div>
@@ -561,5 +554,52 @@ export function ExportIncome() {
                 </Card>
             )}
         </>
+    );
+}
+
+function IncomeGroupedView({ data, groupBy, formatCurrency }: { data: any[], groupBy: string, formatCurrency: (n: number) => string }) {
+    const grouped = useMemo(() => {
+        const groups: Record<string, { items: any[], totals: { base: number, gst: number, total: number } }> = {};
+        
+        data.forEach(row => {
+            let key = '';
+            switch (groupBy) {
+                case 'category': key = row.category || 'Unknown'; break;
+                case 'month': key = row.month_name || 'Unknown'; break;
+                case 'status': key = row.status || 'Unknown'; break;
+                default: key = 'All';
+            }
+            
+            if (!groups[key]) {
+                groups[key] = { items: [], totals: { base: 0, gst: 0, total: 0 } };
+            }
+            groups[key].items.push(row);
+            groups[key].totals.base += row.base_amount;
+            groups[key].totals.gst += row.gst_amount;
+            groups[key].totals.total += row.total_amount;
+        });
+        
+        return Object.entries(groups).sort((a, b) => b[1].totals.total - a[1].totals.total);
+    }, [data, groupBy]);
+
+    return (
+        <div className="space-y-2">
+            {grouped.map(([key, { items, totals }]) => (
+                <div key={key} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{key}</span>
+                            <span className="text-xs text-muted-foreground">({items.length} items)</span>
+                        </div>
+                        <span className="font-semibold text-sm">{formatCurrency(totals.total)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                        <div>Base: {formatCurrency(totals.base)}</div>
+                        <div>GST: {formatCurrency(totals.gst)}</div>
+                        <div className="font-medium text-foreground">Total: {formatCurrency(totals.total)}</div>
+                    </div>
+                </div>
+            ))}
+        </div>
     );
 }
