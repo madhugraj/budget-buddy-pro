@@ -1,17 +1,24 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CalendarIcon, FileSpreadsheet, FileText, FileDown, BarChart3 } from 'lucide-react';
+import { Loader2, CalendarIcon, FileSpreadsheet, FileText, Download, Eye, ChevronDown } from 'lucide-react';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface GSTRow {
     type: 'Income' | 'Expense';
@@ -29,6 +36,7 @@ export function ExportGST() {
     const [dateTo, setDateTo] = useState<Date | undefined>();
     const [viewData, setViewData] = useState<GSTRow[]>([]);
     const [showView, setShowView] = useState(false);
+    const [groupBy, setGroupBy] = useState<string>('none');
     const { toast } = useToast();
 
     // Fetch combined GST data with corrected logic
@@ -344,12 +352,11 @@ export function ExportGST() {
     return (
         <>
             <Card>
-                <CardHeader>
+                <CardHeader className="pb-3">
                     <div className="flex items-center gap-2">
-                        <FileDown className="h-5 w-5 text-primary" />
-                        <CardTitle>Export GST (Income + Expense)</CardTitle>
+                        <Download className="h-4 w-4 text-primary" />
+                        <CardTitle className="text-base">Export GST</CardTitle>
                     </div>
-                    <CardDescription>Download combined GST report for income and expenses</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">
@@ -382,29 +389,39 @@ export function ExportGST() {
                             </Popover>
                         </div>
                     </div>
-                    <div className="flex gap-3 flex-wrap">
-                        <Button onClick={handleView} disabled={loading} variant="secondary" className="flex-1 min-w-[200px]">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                            View Report
+                    <div className="flex gap-2 items-center">
+                        <Button onClick={handleView} disabled={loading} size="sm" variant="default">
+                            {loading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Eye className="mr-1.5 h-3.5 w-3.5" />}
+                            View
                         </Button>
-                        <Button onClick={handleExportPDF} disabled={loading} variant="outline" className="flex-1 min-w-[200px]">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                            Export to PDF (Detailed)
-                        </Button>
-                    </div>
-                    <div className="flex gap-3 flex-wrap">
-                        <Button onClick={handleExportSummaryPDF} disabled={loading} variant="default" className="flex-1 min-w-[200px]">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
-                            Export Summary PDF
-                        </Button>
-                        <Button onClick={() => handleExport('excel')} disabled={loading} variant="outline" className="flex-1 min-w-[200px]">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
-                            Export to Excel
-                        </Button>
-                        <Button onClick={() => handleExport('csv')} disabled={loading} variant="outline" className="flex-1 min-w-[200px]">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                            Export to CSV
-                        </Button>
+                        
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={loading}>
+                                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                                    Export
+                                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleExportPDF}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    PDF (Detailed)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleExportSummaryPDF}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    PDF (Summary)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('excel')}>
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                    Excel
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    CSV
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                     {showView && viewData.length > 0 && (
                         <Card className="mt-6">
