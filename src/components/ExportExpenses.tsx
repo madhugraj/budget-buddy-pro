@@ -612,7 +612,7 @@ export function ExportExpenses() {
               <span>Analysis ({selectedStats.count})</span>
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
+          <SheetContent className="w-full sm:max-w-xl flex flex-col p-0">
             <div className="p-6 pt-12 pb-4 border-b bg-card z-10">
               <div className="flex items-center justify-between">
                 <div>
@@ -642,6 +642,7 @@ export function ExportExpenses() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent border-none">
                         <TableHead className="w-[50px] text-xs font-semibold h-8 text-primary">#</TableHead>
+                        <TableHead className="text-xs font-semibold h-8 text-primary">Date</TableHead>
                         <TableHead className="text-xs font-semibold h-8 text-primary">Item Description</TableHead>
                         <TableHead className="text-xs font-semibold h-8 text-right text-primary">Amount</TableHead>
                       </TableRow>
@@ -650,6 +651,7 @@ export function ExportExpenses() {
                       {selectedStats.items.map((item: any, index: number) => (
                         <TableRow key={item.id} className="hover:bg-muted/50 border-b border-muted/50">
                           <TableCell className="py-2 text-xs text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="py-2 text-xs text-muted-foreground whitespace-nowrap">{item.date}</TableCell>
                           <TableCell className="py-2 text-xs font-medium text-foreground/90">{item.item_name}</TableCell>
                           <TableCell className="py-2 text-right text-xs font-mono">{formatCurrency(item.net_payment)}</TableCell>
                         </TableRow>
