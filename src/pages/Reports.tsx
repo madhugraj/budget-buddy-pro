@@ -4,6 +4,7 @@ import { ExportGST } from '@/components/ExportGST';
 import { ExportBudget } from '@/components/ExportBudget';
 import { ExportPettyCash } from '@/components/ExportPettyCash';
 import { ExportCAM } from '@/components/ExportCAM';
+import { GSTR1Filing } from '@/components/GSTR1Filing';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -32,7 +33,7 @@ export default function Reports() {
   };
 
   // Count visible tabs for grid
-  const visibleTabCount = [canAccessExpense, canAccessIncome, canAccessGST, canAccessBudget, canAccessPettyCash, canAccessCAM].filter(Boolean).length;
+  const visibleTabCount = [canAccessExpense, canAccessIncome, canAccessGST, canAccessGST, canAccessBudget, canAccessPettyCash, canAccessCAM].filter(Boolean).length;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -44,10 +45,14 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue={getDefaultTab()} className="w-full">
-        <TabsList className={`grid w-full max-w-3xl`} style={{ gridTemplateColumns: `repeat(${visibleTabCount}, 1fr)` }}>
+        <TabsList className={`grid w-full h-auto gap-4 md:gap-0`} style={{
+          gridTemplateColumns: `repeat(${Math.min(visibleTabCount, 4)}, 1fr)`,
+          // For mobile/wrapping, we might want a different layout, but for now matching existing style
+        }}>
           {canAccessExpense && <TabsTrigger value="expense">Expense</TabsTrigger>}
           {canAccessIncome && <TabsTrigger value="income">Income</TabsTrigger>}
-          {canAccessGST && <TabsTrigger value="gst">GST</TabsTrigger>}
+          {canAccessGST && <TabsTrigger value="gst">GST Analytics</TabsTrigger>}
+          {canAccessGST && <TabsTrigger value="gstr1">GSTR-1 Filing</TabsTrigger>}
           {canAccessBudget && <TabsTrigger value="budget">Budget</TabsTrigger>}
           {canAccessPettyCash && <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>}
           {canAccessCAM && <TabsTrigger value="cam">CAM</TabsTrigger>}
@@ -68,6 +73,12 @@ export default function Reports() {
         {canAccessGST && (
           <TabsContent value="gst" className="mt-6">
             <ExportGST />
+          </TabsContent>
+        )}
+
+        {canAccessGST && (
+          <TabsContent value="gstr1" className="mt-6">
+            <GSTR1Filing />
           </TabsContent>
         )}
 
