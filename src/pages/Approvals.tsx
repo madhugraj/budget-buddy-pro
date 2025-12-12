@@ -108,6 +108,46 @@ interface CAMRecord {
   };
 }
 
+interface SavingsMaster {
+  id: string;
+  investment_type: string;
+  investment_name: string;
+  bank_institution: string;
+  principal_amount: number;
+  interest_rate: number | null;
+  start_date: string;
+  maturity_date: string | null;
+  current_value: number;
+  current_status: string;
+  status: string;
+  created_at: string;
+  submitted_at: string | null;
+  created_by: string;
+  profiles: {
+    full_name: string;
+    email: string;
+  };
+}
+
+interface SavingsTracking {
+  id: string;
+  savings_id: string;
+  action_type: string;
+  amount: number;
+  value_after_action: number;
+  status: string;
+  submitted_at: string | null;
+  submitted_by: string;
+  profiles: {
+    full_name: string;
+    email: string;
+  };
+  savings_master: {
+    investment_name: string;
+    investment_type: string;
+  } | null;
+}
+
 export default function Approvals() {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -122,6 +162,8 @@ export default function Approvals() {
   const [pendingIncome, setPendingIncome] = useState<Income[]>([]);
   const [pendingPettyCash, setPendingPettyCash] = useState<PettyCash[]>([]);
   const [pendingCAM, setPendingCAM] = useState<CAMRecord[]>([]);
+  const [pendingSavings, setPendingSavings] = useState<SavingsMaster[]>([]);
+  const [pendingSavingsTracking, setPendingSavingsTracking] = useState<SavingsTracking[]>([]);
   const [correctionRequests, setCorrectionRequests] = useState<Expense[]>([]);
 
 
@@ -134,6 +176,8 @@ export default function Approvals() {
   const [selectedIncomeIds, setSelectedIncomeIds] = useState<Set<string>>(new Set());
   const [selectedPettyCashIds, setSelectedPettyCashIds] = useState<Set<string>>(new Set());
   const [selectedCAMIds, setSelectedCAMIds] = useState<Set<string>>(new Set());
+  const [selectedSavingsIds, setSelectedSavingsIds] = useState<Set<string>>(new Set());
+  const [selectedTrackingIds, setSelectedTrackingIds] = useState<Set<string>>(new Set());
   const [correctionReason, setCorrectionReason] = useState('');
   const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('expenses');
@@ -260,10 +304,60 @@ export default function Approvals() {
       console.log('CAM with Profiles:', camWithProfiles);
       console.log('=== END CAM APPROVALS ===');
 
+      // Fetch pending savings master
+      const { data: pendingSavingsData, error: savingsError } = await supabase
+        .from('savings_master')
+        .select('*')
+        .eq('status', 'submitted')
+        .order('submitted_at', { ascending: false });
+
+      if (savingsError) {
+        console.error('Savings Error:', savingsError);
+        throw savingsError;
+      }
+
+      // Fetch profiles for savings
+      const savingsWithProfiles = await Promise.all(
+        (pendingSavingsData || []).map(async (saving: any) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', saving.created_by)
+            .maybeSingle();
+          return { ...saving, profiles: profile || { full_name: 'Unknown', email: '' } };
+        })
+      );
+
+      // Fetch pending savings tracking
+      const { data: pendingTrackingData, error: trackingError } = await supabase
+        .from('savings_tracking')
+        .select('*, savings_master(investment_name, investment_type)')
+        .eq('status', 'submitted')
+        .order('submitted_at', { ascending: false });
+
+      if (trackingError) {
+        console.error('Tracking Error:', trackingError);
+        throw trackingError;
+      }
+
+      // Fetch profiles for tracking
+      const trackingWithProfiles = await Promise.all(
+        (pendingTrackingData || []).map(async (tracking: any) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', tracking.submitted_by)
+            .maybeSingle();
+          return { ...tracking, profiles: profile || { full_name: 'Unknown', email: '' } };
+        })
+      );
+
       setPendingExpenses(pending || []);
       setPendingIncome(incomeWithProfiles as Income[] || []);
       setPendingPettyCash(pendingPettyCashData as unknown as PettyCash[] || []);
       setPendingCAM(camWithProfiles as CAMRecord[] || []);
+      setPendingSavings(savingsWithProfiles as SavingsMaster[] || []);
+      setPendingSavingsTracking(trackingWithProfiles as SavingsTracking[] || []);
       setCorrectionRequests(corrections || []);
 
     } catch (error: any) {
@@ -837,6 +931,205 @@ export default function Approvals() {
     }
   };
 
+  // Savings approval handlers
+  const handleApproveSavings = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('savings_master')
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Savings Approved',
+        description: 'The investment has been successfully approved.',
+      });
+
+      supabase.functions.invoke('send-savings-notification', {
+        body: { savingsId: id, action: 'approved', type: 'master' },
+      }).catch(err => console.error('Notification failed:', err));
+
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error approving savings',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRejectSavings = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('savings_master')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Savings Rejected',
+        description: 'The investment has been rejected.',
+      });
+
+      supabase.functions.invoke('send-savings-notification', {
+        body: { savingsId: id, action: 'rejected', type: 'master' },
+      }).catch(err => console.error('Notification failed:', err));
+
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error rejecting savings',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleApproveTracking = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get tracking entry to update savings_master
+      const { data: tracking } = await supabase
+        .from('savings_tracking')
+        .select('savings_id, value_after_action, new_status, new_maturity_date, new_interest_rate')
+        .eq('id', id)
+        .single();
+
+      const { error } = await supabase
+        .from('savings_tracking')
+        .update({
+          status: 'approved',
+          approved_by: user.id,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Update savings_master with new values
+      if (tracking) {
+        const updates: any = { current_value: tracking.value_after_action };
+        if (tracking.new_status) updates.current_status = tracking.new_status;
+        if (tracking.new_maturity_date) updates.maturity_date = tracking.new_maturity_date;
+        if (tracking.new_interest_rate) updates.interest_rate = tracking.new_interest_rate;
+
+        await supabase
+          .from('savings_master')
+          .update(updates)
+          .eq('id', tracking.savings_id);
+      }
+
+      toast({
+        title: 'Tracking Approved',
+        description: 'The tracking entry has been approved and values updated.',
+      });
+
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error approving tracking',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRejectTracking = async (id: string) => {
+    setProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('savings_tracking')
+        .update({ status: 'rejected' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Tracking Rejected',
+        description: 'The tracking entry has been rejected.',
+      });
+
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error rejecting tracking',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleBulkApproveSavings = async () => {
+    if (selectedSavingsIds.size === 0 && selectedTrackingIds.size === 0) return;
+
+    setProcessing(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Approve savings master entries
+      if (selectedSavingsIds.size > 0) {
+        const { error } = await supabase
+          .from('savings_master')
+          .update({
+            status: 'approved',
+            approved_by: user.id,
+            approved_at: new Date().toISOString(),
+          })
+          .in('id', Array.from(selectedSavingsIds));
+
+        if (error) throw error;
+      }
+
+      // Approve tracking entries
+      if (selectedTrackingIds.size > 0) {
+        for (const trackingId of selectedTrackingIds) {
+          await handleApproveTracking(trackingId);
+        }
+      }
+
+      toast({
+        title: 'Savings Approved',
+        description: `Approved ${selectedSavingsIds.size + selectedTrackingIds.size} record(s).`,
+      });
+
+      setSelectedSavingsIds(new Set());
+      setSelectedTrackingIds(new Set());
+      loadApprovals();
+    } catch (error: any) {
+      toast({
+        title: 'Error approving savings',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -855,7 +1148,7 @@ export default function Approvals() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="grid w-full max-w-4xl grid-cols-6">
           <TabsTrigger value="expenses">
             Expenses ({pendingExpenses.length})
           </TabsTrigger>
@@ -867,6 +1160,9 @@ export default function Approvals() {
           </TabsTrigger>
           <TabsTrigger value="petty-cash">
             Petty Cash ({pendingPettyCash.length})
+          </TabsTrigger>
+          <TabsTrigger value="savings">
+            Savings ({pendingSavings.length + pendingSavingsTracking.length})
           </TabsTrigger>
           <TabsTrigger value="corrections">
             Corrections ({correctionRequests.length})
@@ -1314,6 +1610,173 @@ export default function Approvals() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="savings" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Pending Savings Approvals</CardTitle>
+                  <CardDescription>Review and approve investments and tracking entries</CardDescription>
+                </div>
+                {(selectedSavingsIds.size > 0 || selectedTrackingIds.size > 0) && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleBulkApproveSavings}
+                      disabled={processing}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve {selectedSavingsIds.size + selectedTrackingIds.size}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pendingSavings.length === 0 && pendingSavingsTracking.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No pending savings approvals
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Pending Investment Masters */}
+                  {pendingSavings.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg flex items-center gap-2">
+                        <Badge variant="outline">New Investments</Badge>
+                        <span className="text-muted-foreground text-sm font-normal">({pendingSavings.length})</span>
+                      </h3>
+                      {pendingSavings.map((saving) => (
+                        <div
+                          key={saving.id}
+                          className="flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedSavingsIds.has(saving.id)}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedSavingsIds);
+                              if (checked) {
+                                newSelected.add(saving.id);
+                              } else {
+                                newSelected.delete(saving.id);
+                              }
+                              setSelectedSavingsIds(newSelected);
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{saving.investment_name}</span>
+                                <Badge variant="secondary">{saving.investment_type}</Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {saving.bank_institution} • Submitted by {saving.profiles?.full_name || 'Unknown'}
+                              </div>
+                              <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                                <span>Principal: <span className="font-medium">{formatCurrency(saving.principal_amount)}</span></span>
+                                {saving.interest_rate && <span>Interest: <span className="font-medium">{saving.interest_rate}%</span></span>}
+                                {saving.maturity_date && <span>Maturity: <span className="font-medium">{new Date(saving.maturity_date).toLocaleDateString()}</span></span>}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 sm:flex-none text-destructive hover:text-destructive"
+                                onClick={() => handleRejectSavings(saving.id)}
+                                disabled={processing}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 sm:flex-none"
+                                onClick={() => handleApproveSavings(saving.id)}
+                                disabled={processing}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pending Tracking Entries */}
+                  {pendingSavingsTracking.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-lg flex items-center gap-2">
+                        <Badge variant="outline">Tracking Updates</Badge>
+                        <span className="text-muted-foreground text-sm font-normal">({pendingSavingsTracking.length})</span>
+                      </h3>
+                      {pendingSavingsTracking.map((tracking) => (
+                        <div
+                          key={tracking.id}
+                          className="flex items-start gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <Checkbox
+                            checked={selectedTrackingIds.has(tracking.id)}
+                            onCheckedChange={(checked) => {
+                              const newSelected = new Set(selectedTrackingIds);
+                              if (checked) {
+                                newSelected.add(tracking.id);
+                              } else {
+                                newSelected.delete(tracking.id);
+                              }
+                              setSelectedTrackingIds(newSelected);
+                            }}
+                            className="mt-1"
+                          />
+                          <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{tracking.savings_master?.investment_name || 'Unknown Investment'}</span>
+                                <Badge variant="outline">{tracking.action_type.replace('_', ' ')}</Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Submitted by {tracking.profiles?.full_name || 'Unknown'}
+                              </div>
+                              <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                                {tracking.amount > 0 && <span>Amount: <span className="font-medium">{formatCurrency(tracking.amount)}</span></span>}
+                                <span>Value After: <span className="font-medium">{formatCurrency(tracking.value_after_action)}</span></span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 sm:flex-none text-destructive hover:text-destructive"
+                                onClick={() => handleRejectTracking(tracking.id)}
+                                disabled={processing}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Reject
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="flex-1 sm:flex-none"
+                                onClick={() => handleApproveTracking(tracking.id)}
+                                disabled={processing}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Approve
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
