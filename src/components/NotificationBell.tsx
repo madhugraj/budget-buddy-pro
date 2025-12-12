@@ -18,6 +18,9 @@ interface NotificationCounts {
   correctionRequests: number;
   pendingPettyCash: number;
   pendingCAM: number;
+  pendingSavings: number;
+  pendingSavingsTracking: number;
+  maturingSavings: number;
 }
 
 export function NotificationBell() {
@@ -29,10 +32,13 @@ export function NotificationBell() {
     correctionRequests: 0,
     pendingPettyCash: 0,
     pendingCAM: 0,
+    pendingSavings: 0,
+    pendingSavingsTracking: 0,
+    maturingSavings: 0,
   });
   const [isOpen, setIsOpen] = useState(false);
 
-  const totalCount = counts.pendingExpenses + counts.pendingIncome + counts.correctionRequests + counts.pendingPettyCash + counts.pendingCAM;
+  const totalCount = counts.pendingExpenses + counts.pendingIncome + counts.correctionRequests + counts.pendingPettyCash + counts.pendingCAM + counts.pendingSavings + counts.pendingSavingsTracking + counts.maturingSavings;
 
   useEffect(() => {
     if (userRole === 'treasurer') {
@@ -76,12 +82,38 @@ export function NotificationBell() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'submitted');
 
+      // Fetch pending savings master count
+      const { count: savingsCount } = await supabase
+        .from('savings_master')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
+
+      // Fetch pending savings tracking count
+      const { count: savingsTrackingCount } = await supabase
+        .from('savings_tracking')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'submitted');
+
+      // Fetch maturing savings (within 30 days)
+      const today = new Date();
+      const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const { count: maturingCount } = await supabase
+        .from('savings_master')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved')
+        .eq('current_status', 'active')
+        .gte('maturity_date', today.toISOString().split('T')[0])
+        .lte('maturity_date', thirtyDaysLater.toISOString().split('T')[0]);
+
       setCounts({
         pendingExpenses: expenseCount || 0,
         pendingIncome: incomeCount || 0,
         correctionRequests: correctionCount || 0,
         pendingPettyCash: pettyCashCount || 0,
         pendingCAM: camCount || 0,
+        pendingSavings: savingsCount || 0,
+        pendingSavingsTracking: savingsTrackingCount || 0,
+        maturingSavings: maturingCount || 0,
       });
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -190,6 +222,36 @@ export function NotificationBell() {
                     </div>
                   </div>
                   <Badge variant="secondary">{counts.pendingCAM}</Badge>
+                </button>
+              )}
+
+              {(counts.pendingSavings > 0 || counts.pendingSavingsTracking > 0) && (
+                <button
+                  onClick={() => handleNavigate('savings')}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                >
+                  <div>
+                    <div className="font-medium">Pending Savings</div>
+                    <div className="text-sm text-muted-foreground">
+                      {counts.pendingSavings + counts.pendingSavingsTracking} savings record{(counts.pendingSavings + counts.pendingSavingsTracking) !== 1 ? 's' : ''} awaiting approval
+                    </div>
+                  </div>
+                  <Badge variant="secondary">{counts.pendingSavings + counts.pendingSavingsTracking}</Badge>
+                </button>
+              )}
+
+              {counts.maturingSavings > 0 && (
+                <button
+                  onClick={() => handleNavigate('savings')}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left border-l-2 border-warning"
+                >
+                  <div>
+                    <div className="font-medium text-warning">Maturing Soon</div>
+                    <div className="text-sm text-muted-foreground">
+                      {counts.maturingSavings} investment{counts.maturingSavings !== 1 ? 's' : ''} maturing within 30 days
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="border-warning text-warning">{counts.maturingSavings}</Badge>
                 </button>
               )}
               

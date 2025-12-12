@@ -724,7 +724,7 @@ export default function Dashboard() {
     </div>
 
     {/* Minimal Stats Cards */}
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-[fade-in_0.6s_ease-out_0.4s_both]">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 animate-[fade-in_0.6s_ease-out_0.4s_both]">
       <Card className="border-none shadow-none bg-gradient-to-br from-card to-primary/5 hover:shadow-md transition-all">
         <CardHeader className="pb-2">
           <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
@@ -758,6 +758,18 @@ export default function Dashboard() {
         <CardContent>
           <div className="text-lg md:text-xl font-semibold break-words">{formatCurrency(stats?.balance || 0)}</div>
           <p className="text-xs text-muted-foreground mt-1">Available funds</p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-none bg-gradient-to-br from-card to-chart-3/5 hover:shadow-md transition-all cursor-pointer" onClick={() => window.location.href = '/savings'}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
+            Savings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-lg md:text-xl font-semibold break-words">View</div>
+          <p className="text-xs text-muted-foreground mt-1">Investments & FDs</p>
         </CardContent>
       </Card>
 

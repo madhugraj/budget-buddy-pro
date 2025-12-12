@@ -1,1 +1,4 @@
 project_id = "ujnxljbaapuvpnjdkick"
+
+[functions.send-savings-notification]
+verify_jwt = false
