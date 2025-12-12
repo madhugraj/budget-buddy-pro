@@ -615,6 +615,170 @@ export type Database = {
         }
         Relationships: []
       }
+      savings_master: {
+        Row: {
+          account_number: string | null
+          approved_at: string | null
+          approved_by: string | null
+          bank_institution: string
+          correction_reason: string | null
+          created_at: string
+          created_by: string
+          current_status: string
+          current_value: number
+          document_url: string | null
+          duration_months: number | null
+          expected_maturity_amount: number | null
+          fiscal_year: string
+          id: string
+          interest_rate: number | null
+          investment_name: string
+          investment_type: string
+          maturity_date: string | null
+          notes: string | null
+          principal_amount: number
+          start_date: string
+          status: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_number?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_institution: string
+          correction_reason?: string | null
+          created_at?: string
+          created_by: string
+          current_status?: string
+          current_value?: number
+          document_url?: string | null
+          duration_months?: number | null
+          expected_maturity_amount?: number | null
+          fiscal_year: string
+          id?: string
+          interest_rate?: number | null
+          investment_name: string
+          investment_type: string
+          maturity_date?: string | null
+          notes?: string | null
+          principal_amount?: number
+          start_date: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_number?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          bank_institution?: string
+          correction_reason?: string | null
+          created_at?: string
+          created_by?: string
+          current_status?: string
+          current_value?: number
+          document_url?: string | null
+          duration_months?: number | null
+          expected_maturity_amount?: number | null
+          fiscal_year?: string
+          id?: string
+          interest_rate?: number | null
+          investment_name?: string
+          investment_type?: string
+          maturity_date?: string | null
+          notes?: string | null
+          principal_amount?: number
+          start_date?: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      savings_tracking: {
+        Row: {
+          action_type: string
+          amount: number | null
+          approved_at: string | null
+          approved_by: string | null
+          correction_reason: string | null
+          created_at: string
+          document_url: string | null
+          fiscal_year: string
+          id: string
+          month: number
+          new_interest_rate: number | null
+          new_maturity_date: string | null
+          new_status: string | null
+          notes: string | null
+          previous_status: string | null
+          savings_id: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string
+          tracking_date: string
+          updated_at: string
+          value_after_action: number
+        }
+        Insert: {
+          action_type: string
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          correction_reason?: string | null
+          created_at?: string
+          document_url?: string | null
+          fiscal_year: string
+          id?: string
+          month: number
+          new_interest_rate?: number | null
+          new_maturity_date?: string | null
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+          savings_id: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by: string
+          tracking_date: string
+          updated_at?: string
+          value_after_action: number
+        }
+        Update: {
+          action_type?: string
+          amount?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          correction_reason?: string | null
+          created_at?: string
+          document_url?: string | null
+          fiscal_year?: string
+          id?: string
+          month?: number
+          new_interest_rate?: number | null
+          new_maturity_date?: string | null
+          new_status?: string | null
+          notes?: string | null
+          previous_status?: string | null
+          savings_id?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string
+          tracking_date?: string
+          updated_at?: string
+          value_after_action?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "savings_tracking_savings_id_fkey"
+            columns: ["savings_id"]
+            isOneToOne: false
+            referencedRelation: "savings_master"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sports_income: {
         Row: {
           amount_received: number
