@@ -73,6 +73,7 @@ export function GSTR1Filing() {
                     gst_amount, 
                     month, 
                     fiscal_year,
+                    notes,
                     income_categories!income_actuals_category_id_fkey (category_name)
                 `)
                 .eq('status', 'approved')
@@ -95,6 +96,12 @@ export function GSTR1Filing() {
 
             if (expenseError) throw expenseError;
 
+            // Helper to extract GSTIN
+            const extractGSTIN = (text: string | null) => {
+                if (!text) return null;
+                const match = text.match(/\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}/);
+                return match ? match[0] : null;
+            };
 
             // Process GSTR-1 Data (Invoice Level)
             const processedData: GSTR1Data[] = (incomeData || []).map((item: any) => {
@@ -110,12 +117,16 @@ export function GSTR1Filing() {
                     else if (rate < 1) rate = 0;
                 }
 
+                // Identify B2B based on GSTIN in notes
+                const foundGSTIN = extractGSTIN(item.notes);
+                const isB2B = !!foundGSTIN;
+
                 return {
                     id: item.id,
                     date: format(new Date(item.created_at), 'dd-MM-yyyy'),
                     invoice_no: `INV-${item.id.substring(0, 6).toUpperCase()}`,
-                    customer: 'Resident',
-                    gstin: '',
+                    customer: isB2B ? 'Registered Business' : 'Resident',
+                    gstin: foundGSTIN || '',
                     taxable_value: taxable,
                     gst_rate: rate,
                     igst: 0,
@@ -124,7 +135,7 @@ export function GSTR1Filing() {
                     cess: 0,
                     hsn_sac: '999598',
                     pos: 'Local',
-                    type: 'B2C',
+                    type: isB2B ? 'B2B' : 'B2C',
                     category_name: item.income_categories?.category_name || 'Income'
                 };
             });
@@ -179,7 +190,7 @@ export function GSTR1Filing() {
         }
     };
 
-    const handleExport = (type: 'b2c' | 'hsn' | 'full' | 'worksheet') => {
+    const handleExport = (type: 'b2c' | 'b2b' | 'hsn' | 'full' | 'worksheet') => {
         if (!gstr1Data.length && !worksheetData) return;
 
         let dataToExport = [];
@@ -204,13 +215,28 @@ export function GSTR1Filing() {
             filename += '_Worksheet';
         } else if (type === 'b2c') {
             const map = new Map();
-            gstr1Data.forEach(d => {
+            gstr1Data.filter(d => d.type === 'B2C').forEach(d => {
                 const key = `${d.pos}-${d.gst_rate}`;
                 if (!map.has(key)) map.set(key, { 'Place Of Supply': d.pos, 'Rate (%)': d.gst_rate, 'Taxable Value': 0, 'Cess Amount': 0 });
                 map.get(key)['Taxable Value'] += d.taxable_value;
             });
             dataToExport = Array.from(map.values());
             filename += '_B2C';
+        } else if (type === 'b2b') {
+            dataToExport = gstr1Data.filter(d => d.type === 'B2B').map(d => ({
+                'GSTIN/UIN': d.gstin,
+                'Invoice Number': d.invoice_no,
+                'Invoice Date': d.date,
+                'Invoice Value': d.taxable_value + d.cgst + d.sgst,
+                'Place Of Supply': d.pos,
+                'Reverse Charge': 'N',
+                'Invoice Type': 'Regular',
+                'E-Commerce GSTIN': '',
+                'Rate (%)': d.gst_rate,
+                'Taxable Value': d.taxable_value,
+                'Cess Amount': d.cess
+            }));
+            filename += '_B2B';
         } else if (type === 'hsn') {
             const map = new Map();
             gstr1Data.forEach(d => {
@@ -318,6 +344,7 @@ export function GSTR1Filing() {
                             <Tabs defaultValue="worksheet" className="w-full">
                                 <TabsList className="grid w-full grid-cols-4">
                                     <TabsTrigger value="worksheet"><Calculator className="w-4 h-4 mr-2" />Monthly Worksheet</TabsTrigger>
+                                    <TabsTrigger value="b2b-4a">GSTR-1 (B2B)</TabsTrigger>
                                     <TabsTrigger value="b2c-small">GSTR-1 (B2C)</TabsTrigger>
                                     <TabsTrigger value="hsn">GSTR-1 (HSN)</TabsTrigger>
                                     <TabsTrigger value="docs">All Invoices</TabsTrigger>
@@ -401,6 +428,49 @@ export function GSTR1Filing() {
                                     </Card>
                                 </TabsContent>
 
+                                <TabsContent value="b2b-4a" className="mt-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-lg font-medium">B2B (Registered) Details</h3>
+                                        <Button variant="outline" size="sm" onClick={() => handleExport('b2b')}>
+                                            <Download className="mr-2 h-4 w-4" /> Export Excel
+                                        </Button>
+                                    </div>
+                                    <div className="border rounded-md overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow className="bg-muted">
+                                                    <TableHead>GSTIN/UIN</TableHead>
+                                                    <TableHead>Invoice No</TableHead>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead className="text-right">Taxable Value</TableHead>
+                                                    <TableHead className="text-right">Total Tax</TableHead>
+                                                    <TableHead className="text-right">Invoice Value</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {gstr1Data.filter(d => d.type === 'B2B').length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                                                            No B2B transactions found containing GSTIN in notes.
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    gstr1Data.filter(d => d.type === 'B2B').map((row) => (
+                                                        <TableRow key={row.id}>
+                                                            <TableCell className="font-mono text-xs">{row.gstin}</TableCell>
+                                                            <TableCell className="text-xs">{row.invoice_no}</TableCell>
+                                                            <TableCell>{row.date}</TableCell>
+                                                            <TableCell className="text-right">₹{row.taxable_value.toLocaleString('en-IN')}</TableCell>
+                                                            <TableCell className="text-right">₹{(row.cgst + row.sgst).toLocaleString('en-IN')}</TableCell>
+                                                            <TableCell className="text-right font-medium">₹{(row.taxable_value + row.cgst + row.sgst).toLocaleString('en-IN')}</TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </TabsContent>
+
                                 <TabsContent value="b2c-small" className="mt-4">
                                     <div className="flex justify-between items-center mb-2">
                                         <h3 className="text-lg font-medium">B2C (Small) Details</h3>
@@ -422,7 +492,7 @@ export function GSTR1Filing() {
                                             <TableBody>
                                                 {(() => {
                                                     const map = new Map();
-                                                    gstr1Data.forEach(d => {
+                                                    gstr1Data.filter(d => d.type === 'B2C').forEach(d => {
                                                         const key = `${d.pos}-${d.gst_rate}`;
                                                         if (!map.has(key)) map.set(key, { pos: d.pos, rate: d.gst_rate, val: 0 });
                                                         map.get(key).val += d.taxable_value;
