@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Download, FileSpreadsheet, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Download, FileSpreadsheet, AlertCircle, RefreshCw, Calculator, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,9 +15,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 interface GSTR1Data {
     id: string;
     date: string;
-    invoice_no: string; // Placeholder (using ID)
-    customer: string; // "Resident" or "Member"
-    gstin: string; // Empty for now
+    invoice_no: string;
+    customer: string;
+    gstin: string;
     taxable_value: number;
     gst_rate: number;
     igst: number;
@@ -25,9 +25,18 @@ interface GSTR1Data {
     sgst: number;
     cess: number;
     hsn_sac: string;
-    pos: string; // Place of Supply
+    pos: string;
     type: 'B2B' | 'B2C' | 'Export';
     category_name: string;
+}
+
+interface WorksheetRow {
+    description: string;
+    taxable: number;
+    gst: number;
+    total: number;
+    is_header?: boolean;
+    is_total?: boolean;
 }
 
 export function GSTR1Filing() {
@@ -35,6 +44,11 @@ export function GSTR1Filing() {
     const [month, setMonth] = useState<string>(new Date().getMonth().toString());
     const [year, setYear] = useState<string>(new Date().getFullYear().toString());
     const [gstr1Data, setGstr1Data] = useState<GSTR1Data[]>([]);
+    const [worksheetData, setWorksheetData] = useState<{
+        incomeRows: WorksheetRow[];
+        expenseTotal: { taxable: number; gst: number };
+        netPayable: number;
+    } | null>(null);
     const [summary, setSummary] = useState<any>(null);
     const { toast } = useToast();
 
@@ -49,7 +63,7 @@ export function GSTR1Filing() {
             const selectedMonth = parseInt(month) + 1; // 1-12
             const selectedYear = parseInt(year);
 
-            // Fetch Approved Income Actuals
+            // 1. Fetch Approved Income Actuals (Output Liability)
             const { data: incomeData, error: incomeError } = await supabase
                 .from('income_actuals')
                 .select(`
@@ -63,45 +77,52 @@ export function GSTR1Filing() {
                 `)
                 .eq('status', 'approved')
                 .eq('month', selectedMonth)
-                .like('fiscal_year', `%${selectedYear - (selectedMonth < 4 ? 1 : 0)}%`); // Rough matching, strict equality better if FY logic refined
+                .like('fiscal_year', `%${selectedYear - (selectedMonth < 4 ? 1 : 0)}%`);
 
             if (incomeError) throw incomeError;
 
-            // Normalize Data
-            // Assumption: Intra-state supply (CGST+SGST)
-            // Assumption: All B2C (Small) for now as no GSTIN stored
+            // 2. Fetch Approved Expenses (Input Credit)
+            // Construct start and end date for the selected month to filter expenses
+            const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+            const endDate = new Date(selectedYear, selectedMonth, 0); // Last day of month
+
+            const { data: expenseData, error: expenseError } = await supabase
+                .from('expenses')
+                .select('amount, gst_amount')
+                .eq('status', 'approved')
+                .gte('expense_date', format(startDate, 'yyyy-MM-dd'))
+                .lte('expense_date', format(endDate, 'yyyy-MM-dd'));
+
+            if (expenseError) throw expenseError;
+
+
+            // Process GSTR-1 Data (Invoice Level)
             const processedData: GSTR1Data[] = (incomeData || []).map((item: any) => {
                 const taxable = Number(item.actual_amount) || 0;
                 const gst = Number(item.gst_amount) || 0;
                 let rate = 0;
-
                 if (taxable > 0) {
                     rate = (gst / taxable) * 100;
-                    // Round to nearest standard rate (5, 12, 18, 28) to handle float errors
                     if (Math.abs(rate - 18) < 1) rate = 18;
                     else if (Math.abs(rate - 12) < 1) rate = 12;
                     else if (Math.abs(rate - 5) < 1) rate = 5;
                     else if (Math.abs(rate - 28) < 1) rate = 28;
-                    else if (rate < 1) rate = 0; // Nil rated or Exempt
+                    else if (rate < 1) rate = 0;
                 }
-
-                // Split GST
-                const cgst = gst / 2;
-                const sgst = gst / 2;
 
                 return {
                     id: item.id,
                     date: format(new Date(item.created_at), 'dd-MM-yyyy'),
-                    invoice_no: `INV-${item.id.substring(0, 6).toUpperCase()}`, // Simulated Invoice No
+                    invoice_no: `INV-${item.id.substring(0, 6).toUpperCase()}`,
                     customer: 'Resident',
                     gstin: '',
                     taxable_value: taxable,
                     gst_rate: rate,
                     igst: 0,
-                    cgst: cgst,
-                    sgst: sgst,
+                    cgst: gst / 2,
+                    sgst: gst / 2,
                     cess: 0,
-                    hsn_sac: '999598', // Maintenance Services SAC
+                    hsn_sac: '999598',
                     pos: 'Local',
                     type: 'B2C',
                     category_name: item.income_categories?.category_name || 'Income'
@@ -110,19 +131,45 @@ export function GSTR1Filing() {
 
             setGstr1Data(processedData);
 
-            // Calculate Summary
-            const totalTaxable = processedData.reduce((sum, d) => sum + d.taxable_value, 0);
-            const totalGST = processedData.reduce((sum, d) => sum + d.cgst + d.sgst + d.igst, 0);
-            const totalInvoiceValue = totalTaxable + totalGST;
+            // Process Monthly Worksheet (Aggregated View)
+            const incomeMap = new Map<string, { taxable: number; gst: number }>();
+            processedData.forEach(d => {
+                const cat = d.category_name;
+                if (!incomeMap.has(cat)) incomeMap.set(cat, { taxable: 0, gst: 0 });
+                const entry = incomeMap.get(cat)!;
+                entry.taxable += d.taxable_value;
+                entry.gst += (d.cgst + d.sgst + d.igst);
+            });
+
+            const incomeRows: WorksheetRow[] = Array.from(incomeMap.entries()).map(([cat, val]) => ({
+                description: cat,
+                taxable: val.taxable,
+                gst: val.gst,
+                total: val.taxable + val.gst
+            }));
+
+            // Totals
+            const totalIncomeTaxable = incomeRows.reduce((sum, r) => sum + r.taxable, 0);
+            const totalIncomeGST = incomeRows.reduce((sum, r) => sum + r.gst, 0);
+
+            // Expenses totals
+            const totalExpenseTaxable = (expenseData || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+            const totalExpenseGST = (expenseData || []).reduce((sum, e) => sum + (Number(e.gst_amount) || 0), 0);
+
+            setWorksheetData({
+                incomeRows,
+                expenseTotal: { taxable: totalExpenseTaxable, gst: totalExpenseGST },
+                netPayable: totalIncomeGST - totalExpenseGST
+            });
 
             setSummary({
                 count: processedData.length,
-                totalTaxable,
-                totalGST,
-                totalInvoiceValue
+                totalTaxable: totalIncomeTaxable,
+                totalGST: totalIncomeGST,
+                totalInvoiceValue: totalIncomeTaxable + totalIncomeGST
             });
 
-            toast({ title: 'GSTR-1 Data Calculated', description: `${processedData.length} invoices processed.` });
+            toast({ title: 'Worksheet Generated', description: `Calculated liability and input credit for ${format(startDate, 'MMM yyyy')}` });
 
         } catch (error: any) {
             console.error(error);
@@ -132,59 +179,55 @@ export function GSTR1Filing() {
         }
     };
 
-    const handleExport = (type: 'b2c' | 'hsn' | 'full') => {
-        if (gstr1Data.length === 0) return;
+    const handleExport = (type: 'b2c' | 'hsn' | 'full' | 'worksheet') => {
+        if (!gstr1Data.length && !worksheetData) return;
 
         let dataToExport = [];
-        let filename = `GSTR1_${format(new Date(), 'yyyyMMdd')}`;
+        let filename = `GSTR_${format(new Date(), 'yyyyMMdd')}`;
 
-        if (type === 'b2c') {
-            // Aggregate by Rate
+        if (type === 'worksheet' && worksheetData) {
+            dataToExport = [
+                { Description: '--- OUTPUT LIABILITY (SALES) ---', Taxable: '', GST: '', Total: '' },
+                ...worksheetData.incomeRows.map(r => ({
+                    Description: r.description,
+                    Taxable: r.taxable,
+                    GST: r.gst,
+                    Total: r.total
+                })),
+                { Description: 'TOTAL SALES', Taxable: summary.totalTaxable, GST: summary.totalGST, Total: summary.totalInvoiceValue },
+                { Description: '', Taxable: '', GST: '', Total: '' },
+                { Description: '--- INPUT CREDIT (PURCHASES) ---', Taxable: '', GST: '', Total: '' },
+                { Description: 'Total Eligible EXPENSES', Taxable: worksheetData.expenseTotal.taxable, GST: worksheetData.expenseTotal.gst, Total: worksheetData.expenseTotal.taxable + worksheetData.expenseTotal.gst },
+                { Description: '', Taxable: '', GST: '', Total: '' },
+                { Description: '--- NET PAYABLE ---', Taxable: '', GST: worksheetData.netPayable, Total: '' },
+            ];
+            filename += '_Worksheet';
+        } else if (type === 'b2c') {
             const map = new Map();
             gstr1Data.forEach(d => {
                 const key = `${d.pos}-${d.gst_rate}`;
-                if (!map.has(key)) {
-                    map.set(key, {
-                        'Place Of Supply': d.pos,
-                        'Rate (%)': d.gst_rate,
-                        'Taxable Value': 0,
-                        'Cess Amount': 0
-                    });
-                }
-                const entry = map.get(key);
-                entry['Taxable Value'] += d.taxable_value;
+                if (!map.has(key)) map.set(key, { 'Place Of Supply': d.pos, 'Rate (%)': d.gst_rate, 'Taxable Value': 0, 'Cess Amount': 0 });
+                map.get(key)['Taxable Value'] += d.taxable_value;
             });
             dataToExport = Array.from(map.values());
             filename += '_B2C';
         } else if (type === 'hsn') {
-            // Aggregate by HSN
             const map = new Map();
             gstr1Data.forEach(d => {
                 const key = `${d.hsn_sac}`;
-                if (!map.has(key)) {
-                    map.set(key, {
-                        'HSN/SAC': d.hsn_sac,
-                        'Description': 'Maintenance Services',
-                        'UQC': 'NA',
-                        'Total Quantity': 0,
-                        'Total Value': 0,
-                        'Taxable Value': 0,
-                        'IGST': 0,
-                        'CGST': 0,
-                        'SGST': 0,
-                        'Cess': 0
-                    });
-                }
+                if (!map.has(key)) map.set(key, {
+                    'HSN/SAC': d.hsn_sac, 'Description': 'Maintenance Services', 'UQC': 'NA',
+                    'Total Quantity': 0, 'Total Value': 0, 'Taxable Value': 0,
+                    'IGST': 0, 'CGST': 0, 'SGST': 0, 'Cess': 0
+                });
                 const entry = map.get(key);
                 entry['Total Value'] += (d.taxable_value + d.cgst + d.sgst + d.igst);
                 entry['Taxable Value'] += d.taxable_value;
-                entry['CGST'] += d.cgst;
-                entry['SGST'] += d.sgst;
+                entry['IGST'] += d.igst; entry['CGST'] += d.cgst; entry['SGST'] += d.sgst;
             });
             dataToExport = Array.from(map.values());
             filename += '_HSN';
         } else {
-            // Full Dump
             dataToExport = gstr1Data;
             filename += '_Detailed';
         }
@@ -198,10 +241,10 @@ export function GSTR1Filing() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <FileSpreadsheet className="h-5 w-5 text-primary" />
-                        GSTR-1 Preparation
+                        Monthly GST Workings & Filing
                     </CardTitle>
                     <CardDescription>
-                        Generate monthly GSTR-1 data for outward supplies (Sales/Income).
+                        Generate "Workings Sheet" for GSTR-3B (Net Liability) and GSTR-1 (Sales Reporting).
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -236,48 +279,127 @@ export function GSTR1Filing() {
                         </div>
                         <Button onClick={fetchGSTR1Data} disabled={loading} className="w-full sm:w-auto">
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                            Process Data
+                            Generate Workings
                         </Button>
                     </div>
 
                     <Alert className="bg-blue-50 text-blue-800 border-blue-200 mb-6">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Note</AlertTitle>
+                        <AlertTitle>Reconciliation Note</AlertTitle>
                         <AlertDescription>
-                            Currently, all income is treated as <strong>B2C Small (Intra-state)</strong> as resident GSTINs are not recorded.
-                            Default SAC Code <strong>999598</strong> is applied.
+                            This tool reconciles <strong>Approved Income</strong> (Output Tax) against <strong>Approved Expenses</strong> (Input Credit)
+                            to estimate your Net GST Payable (GSTR-3B). Detailed invocies are prepared for GSTR-1.
                         </AlertDescription>
                     </Alert>
 
                     {summary && (
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                             <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Invoices</p>
-                                <p className="text-2xl font-bold">{summary.count}</p>
+                                <p className="text-sm text-muted-foreground uppercase font-bold">Total Sales</p>
+                                <p className="text-2xl font-bold">₹{summary.totalInvoiceValue.toLocaleString('en-IN')}</p>
                             </div>
                             <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Taxable Value</p>
-                                <p className="text-2xl font-bold">₹{summary.totalTaxable.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Total Tax</p>
+                                <p className="text-sm text-muted-foreground uppercase font-bold">Output GST</p>
                                 <p className="text-2xl font-bold text-red-600">₹{summary.totalGST.toLocaleString('en-IN')}</p>
                             </div>
                             <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Total Value</p>
-                                <p className="text-2xl font-bold text-green-600">₹{summary.totalInvoiceValue.toLocaleString('en-IN')}</p>
+                                <p className="text-sm text-muted-foreground uppercase font-bold">Input Credit</p>
+                                <p className="text-2xl font-bold text-green-600">₹{worksheetData?.expenseTotal.gst.toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="bg-primary/10 p-4 rounded-lg text-center border-2 border-primary/20">
+                                <p className="text-sm text-primary uppercase font-bold">Net Payable</p>
+                                <p className="text-2xl font-bold text-primary">₹{worksheetData?.netPayable.toLocaleString('en-IN')}</p>
                             </div>
                         </div>
                     )}
 
-                    {gstr1Data.length > 0 && (
+                    {gstr1Data.length > 0 && worksheetData && (
                         <div className="space-y-4">
-                            <Tabs defaultValue="b2c-small" className="w-full">
-                                <TabsList className="grid w-full grid-cols-3">
-                                    <TabsTrigger value="b2c-small">B2C (Small) - Table 7</TabsTrigger>
-                                    <TabsTrigger value="hsn">HSN Summary - Table 12</TabsTrigger>
-                                    <TabsTrigger value="docs">Document Details - Table 13</TabsTrigger>
+                            <Tabs defaultValue="worksheet" className="w-full">
+                                <TabsList className="grid w-full grid-cols-4">
+                                    <TabsTrigger value="worksheet"><Calculator className="w-4 h-4 mr-2" />Monthly Worksheet</TabsTrigger>
+                                    <TabsTrigger value="b2c-small">GSTR-1 (B2C)</TabsTrigger>
+                                    <TabsTrigger value="hsn">GSTR-1 (HSN)</TabsTrigger>
+                                    <TabsTrigger value="docs">All Invoices</TabsTrigger>
                                 </TabsList>
+
+                                <TabsContent value="worksheet" className="mt-4 animate-in fade-in-50">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-lg font-medium">Monthly GST Workings</h3>
+                                        <Button variant="outline" size="sm" onClick={() => handleExport('worksheet')}>
+                                            <Download className="mr-2 h-4 w-4" /> Export Worksheet
+                                        </Button>
+                                    </div>
+                                    <Card>
+                                        <CardContent className="p-0 overflow-hidden">
+                                            <Table>
+                                                <TableHeader className="bg-muted">
+                                                    <TableRow>
+                                                        <TableHead className="w-[40%]">Description</TableHead>
+                                                        <TableHead className="text-right">Taxable Value</TableHead>
+                                                        <TableHead className="text-right">GST Amount</TableHead>
+                                                        <TableHead className="text-right">Total Value</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    <TableRow className="bg-slate-50 font-semibold text-xs uppercase text-muted-foreground">
+                                                        <TableCell colSpan={4}>Output Liability (Approved Income)</TableCell>
+                                                    </TableRow>
+                                                    {worksheetData.incomeRows.length === 0 ? (
+                                                        <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">No income records found</TableCell></TableRow>
+                                                    ) : worksheetData.incomeRows.map((row, i) => (
+                                                        <TableRow key={i}>
+                                                            <TableCell className="font-medium">{row.description}</TableCell>
+                                                            <TableCell className="text-right">₹{row.taxable.toLocaleString('en-IN')}</TableCell>
+                                                            <TableCell className="text-right text-red-600">₹{row.gst.toLocaleString('en-IN')}</TableCell>
+                                                            <TableCell className="text-right font-medium">₹{row.total.toLocaleString('en-IN')}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    <TableRow className="bg-slate-100 font-bold">
+                                                        <TableCell>Total Sales (A)</TableCell>
+                                                        <TableCell className="text-right">₹{summary.totalTaxable.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right text-red-700">₹{summary.totalGST.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right">₹{summary.totalInvoiceValue.toLocaleString('en-IN')}</TableCell>
+                                                    </TableRow>
+
+                                                    <TableRow className="h-4 bg-transparent border-none"><TableCell colSpan={4}></TableCell></TableRow>
+
+                                                    <TableRow className="bg-slate-50 font-semibold text-xs uppercase text-muted-foreground">
+                                                        <TableCell colSpan={4}>Input Tax Credit (Approved Expenses)</TableCell>
+                                                    </TableRow>
+                                                    <TableRow>
+                                                        <TableCell>Total Eligible Purchases</TableCell>
+                                                        <TableCell className="text-right">₹{worksheetData.expenseTotal.taxable.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right text-green-600">₹{worksheetData.expenseTotal.gst.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right font-medium">₹{(worksheetData.expenseTotal.taxable + worksheetData.expenseTotal.gst).toLocaleString('en-IN')}</TableCell>
+                                                    </TableRow>
+                                                    <TableRow className="bg-slate-100 font-bold">
+                                                        <TableCell>Total Input Credit (B)</TableCell>
+                                                        <TableCell className="text-right"></TableCell>
+                                                        <TableCell className="text-right text-green-700">₹{worksheetData.expenseTotal.gst.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right"></TableCell>
+                                                    </TableRow>
+
+                                                    <TableRow className="h-4 bg-transparent border-none"><TableCell colSpan={4}></TableCell></TableRow>
+
+                                                    <TableRow className="bg-primary/5 font-bold text-lg border-t-2 border-primary">
+                                                        <TableCell>NET GST PAYABLE (A - B)</TableCell>
+                                                        <TableCell className="text-right"></TableCell>
+                                                        <TableCell className="text-right text-primary">₹{worksheetData.netPayable.toLocaleString('en-IN')}</TableCell>
+                                                        <TableCell className="text-right flex items-center justify-end gap-2">
+
+                                                            {worksheetData.netPayable > 0 ? (
+                                                                <span className="text-sm font-normal text-muted-foreground">(Payable)</span>
+                                                            ) : (
+                                                                <span className="text-sm font-normal text-muted-foreground">(Credit)</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                </TableBody>
+                                            </Table>
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
 
                                 <TabsContent value="b2c-small" className="mt-4">
                                     <div className="flex justify-between items-center mb-2">
@@ -298,7 +420,6 @@ export function GSTR1Filing() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {/* Aggregate by Rate */}
                                                 {(() => {
                                                     const map = new Map();
                                                     gstr1Data.forEach(d => {
@@ -321,6 +442,7 @@ export function GSTR1Filing() {
                                     </div>
                                 </TabsContent>
 
+                                {/* GSTR-1 HSN & Docs Tabs kept same */}
                                 <TabsContent value="hsn" className="mt-4">
                                     <div className="flex justify-between items-center mb-2">
                                         <h3 className="text-lg font-medium">HSN Wise Summary</h3>
@@ -345,7 +467,6 @@ export function GSTR1Filing() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {/* Aggregate by HSN */}
                                                 {(() => {
                                                     const map = new Map();
                                                     gstr1Data.forEach(d => {
