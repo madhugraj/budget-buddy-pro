@@ -20,8 +20,7 @@ import {
   Trophy,
   ChevronLeft,
   ChevronRight,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PiggyBank,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -52,6 +51,7 @@ const navigation = [
   { name: 'Reports', href: '/reports', icon: FileBarChart, roles: ['treasurer', 'accountant', 'lead'] },
   { name: 'Missing Data Report', href: '/missing-data-report', icon: AlertCircle, roles: ['treasurer'] },
   { name: 'Petty Cash', href: '/petty-cash', icon: Receipt, roles: ['treasurer', 'lead', 'accountant'] },
+  { name: 'Savings', href: '/savings', icon: PiggyBank, roles: ['treasurer', 'accountant'] },
   { name: 'CAM Tracking', href: '/cam-tracking', icon: Building2, roles: ['treasurer', 'lead'] },
   { name: 'CAM Reports', href: '/cam-reports', icon: FileBarChart, roles: ['treasurer'] },
   { name: 'Historical Data', href: '/historical', icon: History, roles: ['treasurer', 'accountant'] },

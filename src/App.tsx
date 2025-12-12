@@ -22,6 +22,7 @@ import CAMTracking from "./pages/CAMTracking";
 import MissingDataReport from "./pages/MissingDataReport";
 import SportsIncome from "./pages/SportsIncome";
 import CAMReports from "./pages/CAMReports";
+import Savings from "./pages/Savings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -188,10 +189,20 @@ const App = () => (
                   <AppLayout>
                     <CAMReports />
                   </AppLayout>
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/savings"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Savings />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
