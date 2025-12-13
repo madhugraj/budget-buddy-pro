@@ -11,6 +11,7 @@ import { Loader2, Download, FileSpreadsheet, AlertCircle, RefreshCw, Calculator,
 import { format } from 'date-fns';
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 interface GSTR1Data {
     id: string;
@@ -64,6 +65,7 @@ export function GSTR1Filing() {
             const selectedYear = parseInt(year);
 
             // 1. Fetch Approved Income Actuals (Output Liability)
+            // 1. Fetch Approved Income Actuals (Output Liability)
             const { data: incomeData, error: incomeError } = await supabase
                 .from('income_actuals')
                 .select(`
@@ -74,7 +76,7 @@ export function GSTR1Filing() {
                     month, 
                     fiscal_year,
                     notes,
-                    income_categories!income_actuals_category_id_fkey (category_name)
+                    income_categories!income_actuals_category_id_fkey (category_name, subcategory_name)
                 `)
                 .eq('status', 'approved')
                 .eq('month', selectedMonth)
@@ -103,6 +105,12 @@ export function GSTR1Filing() {
                 return match ? match[0] : null;
             };
 
+            const B2B_SUBCATEGORIES = [
+                'INDUS TOWER - RENTAL',
+                'HDFC TOWER - RENTAL',
+                'VEDHIKA FOODS - RENTAL'
+            ];
+
             // Process GSTR-1 Data (Invoice Level)
             const processedData: GSTR1Data[] = (incomeData || []).map((item: any) => {
                 const taxable = Number(item.actual_amount) || 0;
@@ -117,16 +125,16 @@ export function GSTR1Filing() {
                     else if (rate < 1) rate = 0;
                 }
 
-                // Identify B2B based on GSTIN in notes
+                const subCategory = item.income_categories?.subcategory_name?.trim() || '';
+                const isB2B = B2B_SUBCATEGORIES.some(b => subCategory.includes(b)); // Check if known B2B
                 const foundGSTIN = extractGSTIN(item.notes);
-                const isB2B = !!foundGSTIN;
 
                 return {
                     id: item.id,
                     date: format(new Date(item.created_at), 'dd-MM-yyyy'),
                     invoice_no: `INV-${item.id.substring(0, 6).toUpperCase()}`,
-                    customer: isB2B ? 'Registered Business' : 'Resident',
-                    gstin: foundGSTIN || '',
+                    customer: isB2B ? subCategory : 'Resident',
+                    gstin: foundGSTIN || (isB2B ? 'GSTIN_NOT_FOUND' : ''),
                     taxable_value: taxable,
                     gst_rate: rate,
                     igst: 0,
@@ -319,23 +327,55 @@ export function GSTR1Filing() {
                     </Alert>
 
                     {summary && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Total Sales</p>
-                                <p className="text-2xl font-bold">₹{summary.totalInvoiceValue.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Output GST</p>
-                                <p className="text-2xl font-bold text-red-600">₹{summary.totalGST.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-muted/30 p-4 rounded-lg text-center">
-                                <p className="text-sm text-muted-foreground uppercase font-bold">Input Credit</p>
-                                <p className="text-2xl font-bold text-green-600">₹{worksheetData?.expenseTotal.gst.toLocaleString('en-IN')}</p>
-                            </div>
-                            <div className="bg-primary/10 p-4 rounded-lg text-center border-2 border-primary/20">
-                                <p className="text-sm text-primary uppercase font-bold">Net Payable</p>
-                                <p className="text-2xl font-bold text-primary">₹{worksheetData?.netPayable.toLocaleString('en-IN')}</p>
-                            </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950 dark:to-background border-blue-100 dark:border-blue-900">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Total Sales</p>
+                                    <p className="text-2xl font-bold text-foreground">₹{summary.totalInvoiceValue.toLocaleString('en-IN')}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{summary.count} Invoices</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-gradient-to-br from-red-50 to-white dark:from-red-950 dark:to-background border-red-100 dark:border-red-900">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-1">Output GST (Liability)</p>
+                                    <p className="text-2xl font-bold text-red-600 dark:text-red-500">₹{summary.totalGST.toLocaleString('en-IN')}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">From Sales</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-gradient-to-br from-green-50 to-white dark:from-green-950 dark:to-background border-green-100 dark:border-green-900">
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">Input Tax Credit</p>
+                                    <p className="text-2xl font-bold text-green-600 dark:text-green-500">₹{worksheetData?.expenseTotal.gst.toLocaleString('en-IN')}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">From Expenses</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className={cn(
+                                "border-2",
+                                worksheetData?.netPayable > 0
+                                    ? "bg-gradient-to-br from-orange-50 to-white dark:from-orange-950 dark:to-background border-orange-200 dark:border-orange-900"
+                                    : "bg-gradient-to-br from-teal-50 to-white dark:from-teal-950 dark:to-background border-teal-200 dark:border-teal-900"
+                            )}>
+                                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                                    <p className={cn(
+                                        "text-xs font-semibold uppercase tracking-wide mb-1",
+                                        worksheetData?.netPayable > 0 ? "text-orange-600 dark:text-orange-400" : "text-teal-600 dark:text-teal-400"
+                                    )}>
+                                        {worksheetData?.netPayable > 0 ? 'Net Payable' : 'Net Credit'}
+                                    </p>
+                                    <p className={cn(
+                                        "text-2xl font-bold",
+                                        worksheetData?.netPayable > 0 ? "text-orange-600 dark:text-orange-500" : "text-teal-600 dark:text-teal-500"
+                                    )}>
+                                        ₹{Math.abs(worksheetData?.netPayable || 0).toLocaleString('en-IN')}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {worksheetData?.netPayable > 0 ? 'To be paid' : 'Carried forward'}
+                                    </p>
+                                </CardContent>
+                            </Card>
                         </div>
                     )}
 
