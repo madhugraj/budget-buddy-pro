@@ -93,6 +93,22 @@ interface AuditLog {
   };
 }
 
+interface SavingsMaster {
+  id: string;
+  investment_type: string;
+  investment_name: string;
+  bank_institution: string;
+  account_number: string | null;
+  principal_amount: number;
+  interest_rate: number | null;
+  start_date: string;
+  maturity_date: string | null;
+  current_value: number;
+  current_status: string;
+  status: string;
+  created_at: string;
+}
+
 export default function Corrections() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +134,7 @@ export default function Corrections() {
   const [historicalIncome, setHistoricalIncome] = useState<Income[]>([]);
   const [historicalPettyCash, setHistoricalPettyCash] = useState<PettyCash[]>([]);
   const [historicalCAM, setHistoricalCAM] = useState<any[]>([]);
+  const [historicalSavings, setHistoricalSavings] = useState<SavingsMaster[]>([]);
   const [historicalLoading, setHistoricalLoading] = useState(false);
   const [selectedHistorical, setSelectedHistorical] = useState<Set<string>>(new Set());
   const [dateFrom, setDateFrom] = useState<string>('2025-04-01');
@@ -126,7 +143,7 @@ export default function Corrections() {
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [historicalType, setHistoricalType] = useState<'expenses' | 'income' | 'petty_cash' | 'cam'>('expenses');
+  const [historicalType, setHistoricalType] = useState<'expenses' | 'income' | 'petty_cash' | 'cam' | 'savings'>('expenses');
   const [expenseGroupBy, setExpenseGroupBy] = useState<string>('none');
   const [incomeGroupBy, setIncomeGroupBy] = useState<string>('none');
 
@@ -151,11 +168,22 @@ export default function Corrections() {
   const [editPettyCashAmount, setEditPettyCashAmount] = useState<string>('');
   const [editPettyCashDate, setEditPettyCashDate] = useState<string>('');
 
+  // Savings Edit States
+  const [selectedSavings, setSelectedSavings] = useState<SavingsMaster | null>(null);
+  const [editSavingsMode, setEditSavingsMode] = useState(false);
+  const [editSavingsName, setEditSavingsName] = useState('');
+  const [editSavingsBank, setEditSavingsBank] = useState('');
+  const [editSavingsAccount, setEditSavingsAccount] = useState('');
+  const [editSavingsAmount, setEditSavingsAmount] = useState('');
+  const [editSavingsRate, setEditSavingsRate] = useState('');
+  const [editSavingsValue, setEditSavingsValue] = useState('');
+  const [editSavingsStatus, setEditSavingsStatus] = useState('');
+
   // Delete Confirmation State
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
     id: string;
-    type: 'expense' | 'income' | 'petty_cash' | 'cam';
+    type: 'expense' | 'income' | 'petty_cash' | 'cam' | 'savings';
     description: string;
   }>({ isOpen: false, id: '', type: 'expense', description: '' });
   const [deleting, setDeleting] = useState(false);
@@ -197,6 +225,8 @@ export default function Corrections() {
         loadHistoricalPettyCash();
       } else if (historicalType === 'cam') {
         loadHistoricalCAM();
+      } else if (historicalType === 'savings') {
+        loadHistoricalSavings();
       }
     }
   }, [dateFrom, dateTo, userRole, historicalType]);
@@ -430,6 +460,29 @@ export default function Corrections() {
     }
   };
 
+  const loadHistoricalSavings = async () => {
+    if (userRole !== 'accountant' && userRole !== 'treasurer') return;
+
+    setHistoricalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('savings_master')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setHistoricalSavings((data || []) as SavingsMaster[]);
+    } catch (error: any) {
+      toast({
+        title: 'Error loading savings',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setHistoricalLoading(false);
+    }
+  };
+
   const loadCorrections = async () => {
     try {
       let query = supabase
@@ -596,6 +649,8 @@ export default function Corrections() {
     setEditPettyCashAmount(pettyCash.amount.toString());
     setEditPettyCashDate(pettyCash.date);
   };
+
+
 
   const handleSaveCorrection = async () => {
     if (!selectedExpense) return;
@@ -766,7 +821,62 @@ export default function Corrections() {
 
   const navigate = useNavigate();
 
-  const handleDeleteClick = (id: string, type: 'expense' | 'income' | 'petty_cash' | 'cam', description: string) => {
+  const handleTreasurerEditSavings = (saving: SavingsMaster) => {
+    setSelectedSavings(saving);
+    setEditSavingsMode(true);
+    setEditSavingsName(saving.investment_name);
+    setEditSavingsBank(saving.bank_institution);
+    setEditSavingsAccount(saving.account_number || '');
+    setEditSavingsAmount(saving.principal_amount.toString());
+    setEditSavingsRate(saving.interest_rate?.toString() || '');
+    setEditSavingsValue(saving.current_value.toString());
+    setEditSavingsStatus(saving.current_status);
+  };
+
+  const handleSaveSavingsCorrection = async () => {
+    if (!selectedSavings) return;
+
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('savings_master')
+        .update({
+          investment_name: editSavingsName,
+          bank_institution: editSavingsBank,
+          account_number: editSavingsAccount || null,
+          principal_amount: parseFloat(editSavingsAmount),
+          interest_rate: editSavingsRate ? parseFloat(editSavingsRate) : null,
+          current_value: parseFloat(editSavingsValue),
+          current_status: editSavingsStatus as any,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedSavings.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Investment updated',
+        description: 'The investment record has been updated successfully',
+      });
+
+      setSelectedSavings(null);
+      setEditSavingsMode(false);
+      await loadHistoricalSavings();
+    } catch (error: any) {
+      toast({
+        title: 'Error saving investment',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClick = (id: string, type: 'expense' | 'income' | 'petty_cash' | 'cam' | 'savings', description: string) => {
     setDeleteConfirmation({
       isOpen: true,
       id,
@@ -786,7 +896,9 @@ export default function Corrections() {
           ? 'income_actuals'
           : deleteConfirmation.type === 'petty_cash'
             ? 'petty_cash'
-            : 'cam_tracking';
+            : deleteConfirmation.type === 'cam' // Fixed: was implicitly handling cam else logic
+              ? 'cam_tracking'
+              : 'savings_master';
 
       const { error } = await supabase
         .from(table)
@@ -1114,6 +1226,7 @@ export default function Corrections() {
                         <SelectItem value="income">Income</SelectItem>
                         <SelectItem value="petty_cash">Petty Cash</SelectItem>
                         <SelectItem value="cam">CAM</SelectItem>
+                        <SelectItem value="savings">Savings & Investments</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1151,7 +1264,7 @@ export default function Corrections() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>
-                      Historical {historicalType === 'expenses' ? 'Expenses' : historicalType === 'income' ? 'Income' : historicalType === 'petty_cash' ? 'Petty Cash' : 'CAM'} ({historicalType === 'expenses' ? historicalExpenses.length : historicalType === 'income' ? historicalIncome.length : historicalType === 'petty_cash' ? historicalPettyCash.length : historicalCAM.length})
+                      Historical {historicalType === 'expenses' ? 'Expenses' : historicalType === 'income' ? 'Income' : historicalType === 'petty_cash' ? 'Petty Cash' : historicalType === 'savings' ? 'Savings' : 'CAM'} ({historicalType === 'expenses' ? historicalExpenses.length : historicalType === 'income' ? historicalIncome.length : historicalType === 'petty_cash' ? historicalPettyCash.length : historicalType === 'savings' ? historicalSavings.length : historicalCAM.length})
                     </CardTitle>
                     {historicalType === 'expenses' && userRole === 'accountant' && selectedHistorical.size > 0 && (
                       <div className="flex items-center gap-2">
@@ -1469,7 +1582,7 @@ export default function Corrections() {
                         </TableBody>
                       </Table>
                     )
-                  ) : (
+                  ) : historicalType === 'cam' ? (
                     // CAM Table
                     historicalCAM.length === 0 ? (
                       <div className="py-12 text-center">
@@ -1526,6 +1639,81 @@ export default function Corrections() {
                                     size="sm"
                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => handleDeleteClick(cam.id, 'cam', `Tower ${cam.tower}`)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    Delete
+                                  </Button>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )
+                  ) : (
+                    // Savings Table
+                    historicalSavings.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <p className="text-muted-foreground">No historical savings found</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Start Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Investmet Name</TableHead>
+                            <TableHead>Institution</TableHead>
+                            <TableHead>Account No</TableHead>
+                            <TableHead className="text-right">Principal</TableHead>
+                            <TableHead className="text-right">Current Value</TableHead>
+                            <TableHead>Status</TableHead>
+                            {userRole === 'treasurer' && (
+                              <TableHead className="text-center">Actions</TableHead>
+                            )}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {historicalSavings.map((saving) => (
+                            <TableRow key={saving.id}>
+                              <TableCell className="text-sm">
+                                {new Date(saving.start_date).toLocaleDateString('en-IN')}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                <Badge variant="outline">{saving.investment_type}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm font-medium">{saving.investment_name}</TableCell>
+                              <TableCell className="text-sm">{saving.bank_institution}</TableCell>
+                              <TableCell className="text-sm font-mono text-muted-foreground">
+                                {saving.account_number || '-'}
+                              </TableCell>
+                              <TableCell className="text-right text-sm">
+                                {formatCurrency(saving.principal_amount)}
+                              </TableCell>
+                              <TableCell className="text-right text-sm max-w-[200px] truncate font-medium">
+                                {formatCurrency(saving.current_value)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={saving.current_status === 'active' ? 'default' : 'secondary'}>
+                                  {saving.current_status.replace('_', ' ')}
+                                </Badge>
+                              </TableCell>
+                              {userRole === 'treasurer' && (
+                                <TableCell className="text-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleTreasurerEditSavings(saving)}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDeleteClick(saving.id, 'savings' as any, saving.investment_name)}
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
                                     Delete
@@ -2012,6 +2200,125 @@ export default function Corrections() {
           )}
         </DialogContent>
       </Dialog >
+
+      {/* Savings Edit Dialog */}
+      <Dialog open={editSavingsMode} onOpenChange={() => { setSelectedSavings(null); setEditSavingsMode(false); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Investment</DialogTitle>
+            <DialogDescription>
+              Make changes to this investment record.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSavings && (
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveSavingsCorrection(); }} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-type">Type</Label>
+                  <Input value={selectedSavings.investment_type} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-status">Status</Label>
+                  <Select value={editSavingsStatus} onValueChange={setEditSavingsStatus}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="matured">Matured</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                      <SelectItem value="renewed">Renewed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-name">Investment Name *</Label>
+                  <Input
+                    id="edit-savings-name"
+                    value={editSavingsName}
+                    onChange={(e) => setEditSavingsName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-bank">Institution *</Label>
+                  <Input
+                    id="edit-savings-bank"
+                    value={editSavingsBank}
+                    onChange={(e) => setEditSavingsBank(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-savings-account">Account / Folio No.</Label>
+                <Input
+                  id="edit-savings-account"
+                  value={editSavingsAccount}
+                  onChange={(e) => setEditSavingsAccount(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-principal">Principal *</Label>
+                  <Input
+                    id="edit-savings-principal"
+                    type="number"
+                    value={editSavingsAmount}
+                    onChange={(e) => setEditSavingsAmount(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-value">Current Value *</Label>
+                  <Input
+                    id="edit-savings-value"
+                    type="number"
+                    value={editSavingsValue}
+                    onChange={(e) => setEditSavingsValue(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-savings-rate">Interest Rate (%)</Label>
+                  <Input
+                    id="edit-savings-rate"
+                    type="number"
+                    step="0.01"
+                    value={editSavingsRate}
+                    onChange={(e) => setEditSavingsRate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => { setSelectedSavings(null); setEditSavingsMode(false); }}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteConfirmation.isOpen} onOpenChange={(open) => setDeleteConfirmation({ ...deleteConfirmation, isOpen: open })}>
         <AlertDialogContent>
