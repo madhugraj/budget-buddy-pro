@@ -151,18 +151,7 @@ export default function Savings() {
     expected_maturity_amount: '',
     notes: '',
   });
-    investment_type: 'FD' as InvestmentType,
-    investment_name: '',
-    bank_institution: '',
-    account_number: '',
-    principal_amount: '',
-    interest_rate: '',
-    start_date: format(new Date(), 'yyyy-MM-dd'),
-    maturity_date: '',
-    duration_months: '',
-    expected_maturity_amount: '',
-    notes: '',
-  });
+
   const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   // Form states for tracking
@@ -428,26 +417,26 @@ export default function Savings() {
 
   const summaryGroups = summaryGroupBy === 'type'
     ? INVESTMENT_TYPES.map(type => {
-        const typeInvestments = approvedSavings.filter(s => s.investment_type === type.value);
-        const total = typeInvestments.reduce((sum, s) => sum + s.current_value, 0);
-        return {
-          key: type.value,
-          label: type.label,
-          total,
-          count: typeInvestments.length,
-        };
-      }).filter(group => group.total > 0)
+      const typeInvestments = approvedSavings.filter(s => s.investment_type === type.value);
+      const total = typeInvestments.reduce((sum, s) => sum + s.current_value, 0);
+      return {
+        key: type.value,
+        label: type.label,
+        total,
+        count: typeInvestments.length,
+      };
+    }).filter(group => group.total > 0)
     : Array.from(
-        approvedSavings.reduce((map, s) => {
-          const key = s.bank_institution || 'Unknown Institution';
-          const existing = map.get(key) || { key, label: key, total: 0, count: 0 };
-          existing.total += s.current_value;
-          existing.count += 1;
-          map.set(key, existing);
-          return map;
-        }, new Map<string, { key: string; label: string; total: number; count: number }>()
+      approvedSavings.reduce((map, s) => {
+        const key = s.bank_institution || 'Unknown Institution';
+        const existing = map.get(key) || { key, label: key, total: 0, count: 0 };
+        existing.total += s.current_value;
+        existing.count += 1;
+        map.set(key, existing);
+        return map;
+      }, new Map<string, { key: string; label: string; total: number; count: number }>()
       ).values()
-      ).sort((a, b) => b.total - a.total);
+    ).sort((a, b) => b.total - a.total);
 
   const canManage = userRole === 'accountant' || userRole === 'treasurer';
 
@@ -1075,8 +1064,8 @@ export default function Savings() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+        </TabsContent >
+      </Tabs >
+    </div >
   );
 }
