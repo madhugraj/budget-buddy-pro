@@ -149,7 +149,7 @@ export default function Dashboard() {
       const fiscalYearEnd = fiscalYearStart + 1;
 
       const startDate = `${fiscalYearStart}-04-01`;
-      const endDate = `${fiscalYearEnd}-03-31`;
+      const endDate = new Date().toISOString().split('T')[0]; // Current date
 
       console.log('Loading petty cash for fiscal year:', startDate, 'to', endDate);
 
@@ -167,6 +167,16 @@ export default function Dashboard() {
 
       // Process monthly data for fiscal year (Apr-Mar)
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+      // Filter months to strictly show up to current month
+      const currentMonthIndex = now.getMonth(); // 0-11
+      let monthsToShow = 0;
+      if (currentMonthIndex >= 3) {
+        monthsToShow = currentMonthIndex - 3 + 1;
+      } else {
+        monthsToShow = 9 + currentMonthIndex + 1;
+      }
+      const displayMonths = months.slice(0, monthsToShow);
+
       const monthlyMap: Record<string, number> = {};
 
       data?.forEach(item => {
@@ -175,7 +185,7 @@ export default function Dashboard() {
         monthlyMap[month] = (monthlyMap[month] || 0) + Number(item.amount);
       });
 
-      const monthlyChartData = months.map(month => ({
+      const monthlyChartData = displayMonths.map(month => ({
         month,
         amount: monthlyMap[month] || 0
       }));
@@ -233,11 +243,22 @@ export default function Dashboard() {
       setRawCAMData(data || []);
 
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+      // Filter months to strictly show up to current month
+      const currentMonthIndex = now.getMonth(); // 0-11
+      let monthsToShow = 0;
+      if (currentMonthIndex >= 3) {
+        monthsToShow = currentMonthIndex - 3 + 1;
+      } else {
+        monthsToShow = 9 + currentMonthIndex + 1;
+      }
+      const displayMonths = months.slice(0, monthsToShow);
+
       const monthlyPaidStats: Record<number, number> = {};
       const monthlyPendingStats: Record<number, number> = {};
 
       // Initialize all months
-      months.forEach((_, index) => {
+      displayMonths.forEach((_, index) => {
+        // monthNum calculation: Apr(index 0) -> 4. Dec(index 8) -> 12. Jan(index 9) -> 1.
         const monthNum = index < 9 ? index + 4 : index - 8;
         monthlyPaidStats[monthNum] = 0;
         monthlyPendingStats[monthNum] = 0;
@@ -246,18 +267,15 @@ export default function Dashboard() {
       data?.forEach(item => {
         // Monthly aggregation - sum all towers for each month
         if (item.month) {
-          if (!monthlyPaidStats[item.month]) {
-            monthlyPaidStats[item.month] = 0;
-            monthlyPendingStats[item.month] = 0;
+          // Verify if item.month is within the range we are displaying (optional, but safe)
+          if (monthlyPaidStats[item.month] !== undefined) {
+            monthlyPaidStats[item.month] += item.paid_flats;
+            monthlyPendingStats[item.month] += item.pending_flats;
           }
-          monthlyPaidStats[item.month] += item.paid_flats;
-          monthlyPendingStats[item.month] += item.pending_flats;
         }
-
-
       });
 
-      const monthlyChartData = months.map((month, index) => {
+      const monthlyChartData = displayMonths.map((month, index) => {
         const monthNum = index < 9 ? index + 4 : index - 8;
         return {
           month,
@@ -392,19 +410,28 @@ export default function Dashboard() {
   const loadDashboardData = async () => {
     try {
       // Get current fiscal year budget from budget_master
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const fiscalYearStartYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+      const fiscalYearEndYear = fiscalYearStartYear + 1;
+      const fiscalYearString = `FY${fiscalYearStartYear.toString().slice(-2)}-${fiscalYearEndYear.toString().slice(-2)}`;
+
+      const startDate = `${fiscalYearStartYear}-04-01`;
+      const endDate = new Date().toISOString().split('T')[0]; // Current date
+
       const {
         data: budgetData,
         error: budgetError
-      } = await supabase.from('budget_master').select('annual_budget').eq('fiscal_year', 'FY25-26');
+      } = await supabase.from('budget_master').select('annual_budget').eq('fiscal_year', fiscalYearString);
       if (budgetError) throw budgetError;
       const totalBudget = budgetData?.reduce((sum, item) => sum + Number(item.annual_budget), 0) || 0;
 
       // Get approved expenses for current year
-      const currentYear = new Date().getFullYear();
       const {
         data: expensesData,
         error: expensesError
-      } = await supabase.from('expenses').select('amount, gst_amount, status').eq('status', 'approved').gte('expense_date', `${currentYear}-01-01`).lte('expense_date', `${currentYear}-12-31`);
+      } = await supabase.from('expenses').select('amount, gst_amount, status').eq('status', 'approved').gte('expense_date', startDate).lte('expense_date', endDate);
       if (expensesError) throw expensesError;
       const totalExpenses = expensesData?.reduce((sum, exp) => sum + Number(exp.amount) + Number(exp.gst_amount || 0), 0) || 0;
 
@@ -425,19 +452,29 @@ export default function Dashboard() {
       const {
         data: monthlyExpenses,
         error: monthlyError
-      } = await supabase.from('expenses').select('amount, gst_amount, expense_date').eq('status', 'approved').gte('expense_date', '2025-04-01').lte('expense_date', '2025-10-31').order('expense_date');
+      } = await supabase.from('expenses').select('amount, gst_amount, expense_date').eq('status', 'approved').gte('expense_date', startDate).lte('expense_date', endDate).order('expense_date');
       if (monthlyError) throw monthlyError;
 
       // Get monthly budget data
       const {
         data: budgetMaster,
         error: budgetMasterError
-      } = await supabase.from('budget_master').select('monthly_budget').eq('fiscal_year', 'FY25-26');
+      } = await supabase.from('budget_master').select('monthly_budget').eq('fiscal_year', fiscalYearString);
       if (budgetMasterError) throw budgetMasterError;
       const totalMonthlyBudget = budgetMaster?.reduce((sum, item) => sum + Number(item.monthly_budget), 0) || 0;
 
       // Process monthly data
-      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'];
+      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+      // Filter months to strictly show up to current month
+      const currentMonthIndex = now.getMonth(); // 0-11
+      let monthsToShow = 0;
+      if (currentMonthIndex >= 3) {
+        monthsToShow = currentMonthIndex - 3 + 1;
+      } else {
+        monthsToShow = 9 + currentMonthIndex + 1;
+      }
+      const displayMonths = months.slice(0, monthsToShow);
+
       const monthlyMap: Record<string, number> = {};
       monthlyExpenses?.forEach(exp => {
         const month = new Date(exp.expense_date).toLocaleString('en-US', {
@@ -445,7 +482,7 @@ export default function Dashboard() {
         });
         monthlyMap[month] = (monthlyMap[month] || 0) + Number(exp.amount) + Number(exp.gst_amount || 0);
       });
-      const monthlyChartData = months.map(month => ({
+      const monthlyChartData = displayMonths.map(month => ({
         month,
         amount: monthlyMap[month] || 0,
         budget: totalMonthlyBudget
@@ -465,7 +502,7 @@ export default function Dashboard() {
             category,
             committee
           )
-        `).eq('status', 'approved').gte('expense_date', '2025-04-01').lte('expense_date', '2025-10-31');
+        `).eq('status', 'approved').gte('expense_date', startDate).lte('expense_date', endDate);
       if (itemError) throw itemError;
 
       // Aggregate by item
@@ -558,10 +595,17 @@ export default function Dashboard() {
       const categoryMap = new Map(categories?.map(c => [c.id, c]) || []);
 
       // Get income budget data
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const fiscalYearStartYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+      const fiscalYearEndYear = fiscalYearStartYear + 1;
+      const fiscalYearString = `FY${fiscalYearStartYear.toString().slice(-2)}-${fiscalYearEndYear.toString().slice(-2)}`;
+
       const {
         data: budgetData,
         error: budgetError
-      } = await supabase.from('income_budget').select('category_id, budgeted_amount').eq('fiscal_year', 'FY25-26');
+      } = await supabase.from('income_budget').select('category_id, budgeted_amount').eq('fiscal_year', fiscalYearString);
       if (budgetError) throw budgetError;
 
       // Get actual income data - first check what data exists
@@ -594,6 +638,16 @@ export default function Dashboard() {
 
       // Process monthly income data by the month field (which month the income is FOR)
       const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'];
+      // Filter months to strictly show up to current month
+      const currentMonthIndex = now.getMonth(); // 0-11
+      let monthsToShow = 0;
+      if (currentMonthIndex >= 3) {
+        monthsToShow = currentMonthIndex - 3 + 1;
+      } else {
+        monthsToShow = 9 + currentMonthIndex + 1;
+      }
+      const displayMonths = months.slice(0, monthsToShow);
+
       const monthlyActuals: Record<number, number> = {};
       actualData?.forEach(actual => {
         // Use the month field which represents which month this income is for
@@ -611,7 +665,7 @@ export default function Dashboard() {
 
       const totalAnnualBudget = budgetData?.reduce((sum, item) => sum + Number(item.budgeted_amount), 0) || 0;
       const monthlyBudget = totalAnnualBudget / 12;
-      const monthlyIncomeChartData = months.map((month, index) => ({
+      const monthlyIncomeChartData = displayMonths.map((month, index) => ({
         month,
         actual: monthlyActuals[index] || 0,
         budget: monthlyBudget
@@ -744,18 +798,43 @@ export default function Dashboard() {
     {/* Over Budget Alert */}
     <div className="animate-[fade-in_0.6s_ease-out_0.3s_both]">
       <OverBudgetAlert items={allItemData.filter(item => {
-        const proratedBudget = item.budget * 7 / 12; // 7 months elapsed (Apr-Oct)
+        // Calculate dynamic months elapsed based on current date relative to April
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0-11
+        let monthsElapsed = 0;
+        // Apr(3) -> 1 month. Dec(11) -> 9 months. Jan(0) -> 10 months. Mar(2) -> 12 months.
+        if (currentMonth >= 3) { // Apr - Dec
+          monthsElapsed = currentMonth - 3 + 1;
+        } else { // Jan - Mar
+          monthsElapsed = 9 + currentMonth + 1;
+        }
+        monthsElapsed = Math.max(1, monthsElapsed);
+
+        const proratedBudget = item.budget * monthsElapsed / 12;
         return item.amount > proratedBudget;
-      }).map(item => ({
-        item_name: item.full_item_name,
-        budget: item.budget * 7 / 12,
-        // Show prorated budget
-        actual: item.amount,
-        overAmount: item.amount - item.budget * 7 / 12,
-        utilization: item.budget * 7 / 12 > 0 ? item.amount / (item.budget * 7 / 12) * 100 : 0,
-        category: item.category,
-        committee: item.committee
-      }))} />
+      }).map(item => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        let monthsElapsed = 0;
+        if (currentMonth >= 3) {
+          monthsElapsed = currentMonth - 3 + 1;
+        } else {
+          monthsElapsed = 9 + currentMonth + 1;
+        }
+        monthsElapsed = Math.max(1, monthsElapsed);
+
+        const proratedBudget = item.budget * monthsElapsed / 12;
+
+        return {
+          item_name: item.full_item_name,
+          budget: proratedBudget, // Show prorated budget
+          actual: item.amount,
+          overAmount: item.amount - proratedBudget,
+          utilization: proratedBudget > 0 ? item.amount / proratedBudget * 100 : 0,
+          category: item.category,
+          committee: item.committee
+        };
+      })} />
     </div>
 
     {/* Minimal Stats Cards */}
