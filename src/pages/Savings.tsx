@@ -962,40 +962,41 @@ export default function Savings() {
 
         <TabsContent value="summary" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-939:               <CardHeader className="pb-2">
-940:                 <div className="flex items-center justify-between gap-2">
-941:                   <CardTitle className="text-sm font-medium">Investment Summary</CardTitle>
-942:                   <Select
-943:                     value={summaryGroupBy}
-944:                     onValueChange={(v) => setSummaryGroupBy(v as 'type' | 'institution')}
-945:                   >
-946:                     <SelectTrigger className="h-8 w-32 text-xs">
-947:                       <SelectValue placeholder="Group by" />
-948:                     </SelectTrigger>
-949:                     <SelectContent>
-950:                       <SelectItem value="type">Type</SelectItem>
-951:                       <SelectItem value="institution">Institution</SelectItem>
-952:                     </SelectContent>
-953:                   </Select>
-954:                 </div>
-955:               </CardHeader>
-956:               <CardContent>
-957:                 <div className="space-y-3">
-958:                   {summaryGroups.length === 0 ? (
-959:                     <p className="text-sm text-muted-foreground">No approved investments to summarize</p>
-960:                   ) : (
-961:                     summaryGroups.map(group => (
-962:                       <div key={group.key} className="flex justify-between items-center">
-963:                         <span className="text-sm text-muted-foreground">{group.label}</span>
-964:                         <div className="text-right">
-965:                           <span className="text-sm font-medium">{formatCurrency(group.total)}</span>
-966:                           <span className="text-xs text-muted-foreground ml-2">({group.count})</span>
-967:                         </div>
-968:                       </div>
-969:                     ))
-970:                   )}
-971:                 </div>
-972:               </CardContent>
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-sm font-medium">Investment Summary</CardTitle>
+                  <Select
+                    value={summaryGroupBy}
+                    onValueChange={(v) => setSummaryGroupBy(v as 'type' | 'institution')}
+                  >
+                    <SelectTrigger className="h-8 w-32 text-xs">
+                      <SelectValue placeholder="Group by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="type">Type</SelectItem>
+                      <SelectItem value="institution">Institution</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {summaryGroups.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No approved investments to summarize</p>
+                  ) : (
+                    summaryGroups.map(group => (
+                      <div key={group.key} className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">{group.label}</span>
+                        <div className="text-right">
+                          <span className="text-sm font-medium">{formatCurrency(group.total)}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({group.count})</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
             </Card>
 
             <Card>
