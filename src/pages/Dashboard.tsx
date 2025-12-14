@@ -74,6 +74,18 @@ interface TowerCAMData {
   payment_rate: string | number;
 }
 
+interface SavingsSummary {
+  id: string;
+  investment_type: string;
+  investment_name: string;
+  bank_institution: string;
+  account_number: string | null;
+  current_value: number;
+  current_status: string;
+  interest_rate: number | null;
+  maturity_date: string | null;
+}
+
 const CAM_MONTHS = [
   { value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
   { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
@@ -106,6 +118,8 @@ export default function Dashboard() {
   const [pettyCashItemData, setPettyCashItemData] = useState<PettyCashItemData[]>([]);
   const [monthlyCAMData, setMonthlyCAMData] = useState<MonthlyCAMData[]>([]);
   const [towerCAMData, setTowerCAMData] = useState<TowerCAMData[]>([]);
+  const [savingsData, setSavingsData] = useState<SavingsSummary[]>([]);
+  const [savingsTotal, setSavingsTotal] = useState(0);
 
   // New State for CAM filtering
   const [rawCAMData, setRawCAMData] = useState<any[]>([]);
@@ -266,6 +280,25 @@ export default function Dashboard() {
     }
   };
 
+  const loadSavingsData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('savings_master')
+        .select('id, investment_type, investment_name, bank_institution, account_number, current_value, current_status, interest_rate, maturity_date')
+        .eq('status', 'approved')
+        .eq('current_status', 'active')
+        .order('current_value', { ascending: false });
+
+      if (error) throw error;
+
+      setSavingsData(data || []);
+      const total = data?.reduce((sum, item) => sum + Number(item.current_value), 0) || 0;
+      setSavingsTotal(total);
+    } catch (error: any) {
+      console.error('Error loading savings data:', error);
+    }
+  };
+
   // Effect to process tower data when filter changes or raw data loads
   useEffect(() => {
     if (!rawCAMData.length) return;
@@ -345,6 +378,7 @@ export default function Dashboard() {
     loadIncomeData();
     loadPettyCashData();
     loadCAMData();
+    loadSavingsData();
   }, []);
   const refreshCharts = () => {
     setChartKey(prev => prev + 1);
@@ -353,6 +387,7 @@ export default function Dashboard() {
     loadIncomeData();
     loadPettyCashData();
     loadCAMData();
+    loadSavingsData();
   };
   const loadDashboardData = async () => {
     try {
@@ -764,12 +799,12 @@ export default function Dashboard() {
       <Card className="border-none shadow-none bg-gradient-to-br from-card to-chart-3/5 hover:shadow-md transition-all cursor-pointer" onClick={() => window.location.href = '/savings'}>
         <CardHeader className="pb-2">
           <CardTitle className="text-xs md:text-sm font-normal text-muted-foreground">
-            Savings
+            Savings & ROI
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-lg md:text-xl font-semibold break-words">View</div>
-          <p className="text-xs text-muted-foreground mt-1">Investments & FDs</p>
+          <div className="text-lg md:text-xl font-semibold break-words">{formatCurrency(savingsTotal)}</div>
+          <p className="text-xs text-muted-foreground mt-1">{savingsData.length} active investment{savingsData.length !== 1 ? 's' : ''}</p>
         </CardContent>
       </Card>
 
@@ -805,9 +840,10 @@ export default function Dashboard() {
       </div>
 
       <Tabs defaultValue="expense" className="w-full">
-        <TabsList className="grid w-full max-w-md mx-auto grid-cols-4 mb-6">
+        <TabsList className="grid w-full max-w-lg mx-auto grid-cols-5 mb-6">
           <TabsTrigger value="expense">Expense</TabsTrigger>
           <TabsTrigger value="income">Income</TabsTrigger>
+          <TabsTrigger value="savings">Savings</TabsTrigger>
           <TabsTrigger value="cam">CAM</TabsTrigger>
           <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>
         </TabsList>
@@ -948,6 +984,61 @@ export default function Dashboard() {
             monthlyData={monthlyPettyCashData}
             itemData={pettyCashItemData}
           />
+        </TabsContent>
+
+        <TabsContent value="savings" className="space-y-6 mt-6">
+          <Card className="border-none shadow-lg">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-medium">Active Investments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {savingsData.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No active investments found</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Name</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Bank/Institution</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Account/Folio No.</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Current Value</th>
+                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Interest %</th>
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Maturity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {savingsData.map((item) => (
+                        <tr key={item.id} className="border-b border-border/50 hover:bg-muted/30">
+                          <td className="py-2 px-3">
+                            <span className="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">
+                              {item.investment_type}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 font-medium">{item.investment_name}</td>
+                          <td className="py-2 px-3 text-muted-foreground">{item.bank_institution}</td>
+                          <td className="py-2 px-3 font-mono text-xs">{item.account_number || '-'}</td>
+                          <td className="py-2 px-3 text-right font-semibold">{formatCurrency(item.current_value)}</td>
+                          <td className="py-2 px-3 text-right">{item.interest_rate ? `${item.interest_rate}%` : '-'}</td>
+                          <td className="py-2 px-3 text-muted-foreground">
+                            {item.maturity_date ? new Date(item.maturity_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-muted/30">
+                        <td colSpan={4} className="py-2 px-3 font-semibold">Total</td>
+                        <td className="py-2 px-3 text-right font-bold">{formatCurrency(savingsTotal)}</td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
