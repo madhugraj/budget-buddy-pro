@@ -39,17 +39,21 @@ const App = () => (
             <Route
               path="/"
               element={
-                <AppLayout>
-                  <Dashboard />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Dashboard />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
               path="/dashboard"
               element={
-                <AppLayout>
-                  <Dashboard />
-                </AppLayout>
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Dashboard />
+                  </AppLayout>
+                </ProtectedRoute>
               }
             />
             <Route
