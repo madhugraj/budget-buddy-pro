@@ -135,9 +135,22 @@ export default function Savings() {
   const [selectedSaving, setSelectedSaving] = useState<SavingsMaster | null>(null);
   const [editingItem, setEditingItem] = useState<SavingsMaster | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [summaryGroupBy, setSummaryGroupBy] = useState<'type' | 'institution'>('type');
 
   // Form states for new investment
   const [formData, setFormData] = useState({
+    investment_type: 'FD' as InvestmentType,
+    investment_name: '',
+    bank_institution: '',
+    account_number: '',
+    principal_amount: '',
+    interest_rate: '',
+    start_date: format(new Date(), 'yyyy-MM-dd'),
+    maturity_date: '',
+    duration_months: '',
+    expected_maturity_amount: '',
+    notes: '',
+  });
     investment_type: 'FD' as InvestmentType,
     investment_name: '',
     bank_institution: '',
@@ -413,6 +426,29 @@ export default function Savings() {
     return maturity >= today && maturity <= thirtyDaysLater;
   });
 
+  const summaryGroups = summaryGroupBy === 'type'
+    ? INVESTMENT_TYPES.map(type => {
+        const typeInvestments = approvedSavings.filter(s => s.investment_type === type.value);
+        const total = typeInvestments.reduce((sum, s) => sum + s.current_value, 0);
+        return {
+          key: type.value,
+          label: type.label,
+          total,
+          count: typeInvestments.length,
+        };
+      }).filter(group => group.total > 0)
+    : Array.from(
+        approvedSavings.reduce((map, s) => {
+          const key = s.bank_institution || 'Unknown Institution';
+          const existing = map.get(key) || { key, label: key, total: 0, count: 0 };
+          existing.total += s.current_value;
+          existing.count += 1;
+          map.set(key, existing);
+          return map;
+        }, new Map<string, { key: string; label: string; total: number; count: number }>()
+      ).values()
+      ).sort((a, b) => b.total - a.total);
+
   const canManage = userRole === 'accountant' || userRole === 'treasurer';
 
   return (
@@ -638,6 +674,7 @@ export default function Savings() {
                     <TableHead className="text-xs">Type</TableHead>
                     <TableHead className="text-xs">Name</TableHead>
                     <TableHead className="text-xs">Institution</TableHead>
+                    <TableHead className="text-xs">Account/Folio No.</TableHead>
                     <TableHead className="text-xs text-right">Principal</TableHead>
                     <TableHead className="text-xs text-right">Rate</TableHead>
                     <TableHead className="text-xs">Start</TableHead>
@@ -651,7 +688,7 @@ export default function Savings() {
                 <TableBody>
                   {savingsList.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                         No investments found
                       </TableCell>
                     </TableRow>
@@ -665,6 +702,7 @@ export default function Savings() {
                         </TableCell>
                         <TableCell className="text-xs font-medium max-w-[150px] truncate">{saving.investment_name}</TableCell>
                         <TableCell className="text-xs">{saving.bank_institution}</TableCell>
+                        <TableCell className="text-xs font-mono max-w-[140px] truncate">{saving.account_number || '-'}</TableCell>
                         <TableCell className="text-xs text-right font-mono">{formatCurrency(saving.principal_amount)}</TableCell>
                         <TableCell className="text-xs text-right">{saving.interest_rate ? `${saving.interest_rate}%` : '-'}</TableCell>
                         <TableCell className="text-xs">{format(parseISO(saving.start_date), 'dd/MM/yy')}</TableCell>
@@ -935,28 +973,40 @@ export default function Savings() {
 
         <TabsContent value="summary" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Investment by Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {INVESTMENT_TYPES.map(type => {
-                    const typeInvestments = approvedSavings.filter(s => s.investment_type === type.value);
-                    const total = typeInvestments.reduce((sum, s) => sum + s.current_value, 0);
-                    if (total === 0) return null;
-                    return (
-                      <div key={type.value} className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">{type.label}</span>
-                        <div className="text-right">
-                          <span className="text-sm font-medium">{formatCurrency(total)}</span>
-                          <span className="text-xs text-muted-foreground ml-2">({typeInvestments.length})</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
+939:               <CardHeader className="pb-2">
+940:                 <div className="flex items-center justify-between gap-2">
+941:                   <CardTitle className="text-sm font-medium">Investment Summary</CardTitle>
+942:                   <Select
+943:                     value={summaryGroupBy}
+944:                     onValueChange={(v) => setSummaryGroupBy(v as 'type' | 'institution')}
+945:                   >
+946:                     <SelectTrigger className="h-8 w-32 text-xs">
+947:                       <SelectValue placeholder="Group by" />
+948:                     </SelectTrigger>
+949:                     <SelectContent>
+950:                       <SelectItem value="type">Type</SelectItem>
+951:                       <SelectItem value="institution">Institution</SelectItem>
+952:                     </SelectContent>
+953:                   </Select>
+954:                 </div>
+955:               </CardHeader>
+956:               <CardContent>
+957:                 <div className="space-y-3">
+958:                   {summaryGroups.length === 0 ? (
+959:                     <p className="text-sm text-muted-foreground">No approved investments to summarize</p>
+960:                   ) : (
+961:                     summaryGroups.map(group => (
+962:                       <div key={group.key} className="flex justify-between items-center">
+963:                         <span className="text-sm text-muted-foreground">{group.label}</span>
+964:                         <div className="text-right">
+965:                           <span className="text-sm font-medium">{formatCurrency(group.total)}</span>
+966:                           <span className="text-xs text-muted-foreground ml-2">({group.count})</span>
+967:                         </div>
+968:                       </div>
+969:                     ))
+970:                   )}
+971:                 </div>
+972:               </CardContent>
             </Card>
 
             <Card>
@@ -997,6 +1047,7 @@ export default function Savings() {
                     <TableHead className="text-xs">Investment</TableHead>
                     <TableHead className="text-xs">Type</TableHead>
                     <TableHead className="text-xs">Institution</TableHead>
+                    <TableHead className="text-xs">Account/Folio No.</TableHead>
                     <TableHead className="text-xs text-right">Principal</TableHead>
                     <TableHead className="text-xs text-right">Current Value</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
@@ -1009,6 +1060,7 @@ export default function Savings() {
                       <TableCell className="text-xs font-medium">{saving.investment_name}</TableCell>
                       <TableCell className="text-xs">{INVESTMENT_TYPES.find(t => t.value === saving.investment_type)?.label}</TableCell>
                       <TableCell className="text-xs">{saving.bank_institution}</TableCell>
+                      <TableCell className="text-xs font-mono max-w-[160px] truncate">{saving.account_number || '-'}</TableCell>
                       <TableCell className="text-xs text-right font-mono">{formatCurrency(saving.principal_amount)}</TableCell>
                       <TableCell className="text-xs text-right font-mono font-medium">{formatCurrency(saving.current_value)}</TableCell>
                       <TableCell>
