@@ -404,10 +404,18 @@ export default function Savings() {
 
   // Calculate summary stats
   const approvedSavings = savingsList.filter(s => s.status === 'approved');
-  const totalInvested = approvedSavings.reduce((sum, s) => sum + s.principal_amount, 0);
-  const totalCurrentValue = approvedSavings.reduce((sum, s) => sum + s.current_value, 0);
-  const activeInvestments = approvedSavings.filter(s => s.current_status === 'active').length;
-  const upcomingMaturities = approvedSavings.filter(s => {
+
+  // Calculate summary stats - ONLY for Active and Matured investments
+  const activeSavings = savingsList.filter(s =>
+    s.status === 'approved' &&
+    (s.current_status === 'active' || s.current_status === 'matured')
+  );
+
+  const totalInvested = activeSavings.reduce((sum, s) => sum + s.principal_amount, 0);
+  const totalCurrentValue = activeSavings.reduce((sum, s) => sum + s.current_value, 0);
+  const activeInvestments = activeSavings.filter(s => s.current_status === 'active').length;
+
+  const upcomingMaturities = activeSavings.filter(s => {
     if (!s.maturity_date) return false;
     const maturity = new Date(s.maturity_date);
     const today = new Date();
@@ -417,7 +425,7 @@ export default function Savings() {
 
   const summaryGroups = summaryGroupBy === 'type'
     ? INVESTMENT_TYPES.map(type => {
-      const typeInvestments = approvedSavings.filter(s => s.investment_type === type.value);
+      const typeInvestments = activeSavings.filter(s => s.investment_type === type.value);
       const total = typeInvestments.reduce((sum, s) => sum + s.current_value, 0);
       return {
         key: type.value,
@@ -427,7 +435,7 @@ export default function Savings() {
       };
     }).filter(group => group.total > 0)
     : Array.from(
-      approvedSavings.reduce((map, s) => {
+      activeSavings.reduce((map, s) => {
         const key = s.bank_institution || 'Unknown Institution';
         const existing = map.get(key) || { key, label: key, total: 0, count: 0 };
         existing.total += s.current_value;
