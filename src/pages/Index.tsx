@@ -2,9 +2,27 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Shield, ChartBar } from 'lucide-react';
+import { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
   const navigate = useNavigate();
+  const { session, loading } = useAuth();
+
+  useEffect(() => {
+    // Check for standard operations auth
+    if (!loading && session) {
+      navigate('/dashboard');
+      return;
+    }
+
+    // Check for MC auth
+    const mcUser = localStorage.getItem('mc_user');
+    if (mcUser) {
+      navigate('/mc-dashboard');
+      return;
+    }
+  }, [session, loading, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -18,7 +36,7 @@ const Index = () => {
             Society Management Portal
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Comprehensive financial management system for your residential society. 
+            Comprehensive financial management system for your residential society.
             Track expenses, manage budgets, and maintain transparent records.
           </p>
         </div>
@@ -67,7 +85,7 @@ const Index = () => {
       <div className="border-t border-border bg-muted/30 py-12">
         <div className="max-w-4xl mx-auto px-4">
           <h2 className="text-2xl font-semibold text-center mb-8">Sign In to Continue</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {/* Operations Sign In */}
             <Card className="hover:shadow-lg transition-shadow">
@@ -79,8 +97,8 @@ const Index = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={() => navigate('/auth')}
                 >
@@ -99,15 +117,15 @@ const Index = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   size="lg"
                   onClick={() => navigate('/mc-auth')}
                 >
                   MC Login
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => navigate('/mc-register')}
                 >
