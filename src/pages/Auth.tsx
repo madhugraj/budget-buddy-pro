@@ -28,7 +28,7 @@ export default function Auth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: 'Missing Information',
@@ -52,7 +52,7 @@ export default function Auth() {
         title: 'Success',
         description: 'Logged in successfully!',
       });
-      
+
       navigate('/dashboard');
     } catch (error: any) {
       toast({
@@ -99,7 +99,7 @@ export default function Auth() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate('/')}
             className="w-fit mb-2"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -107,7 +107,7 @@ export default function Auth() {
           </Button>
           <CardTitle className="text-2xl font-bold text-center">Admin Login</CardTitle>
           <CardDescription className="text-center">
-            {mode === 'login' 
+            {mode === 'login'
               ? 'Enter your credentials to access the system'
               : 'Reset your password via email'
             }
