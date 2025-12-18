@@ -22,7 +22,7 @@ export default function MCAuth() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username || !password) {
       toast({
         title: 'Missing Information',
@@ -35,25 +35,20 @@ export default function MCAuth() {
     setLoading(true);
 
     try {
-      // Check MC user credentials
-      const { data: mcUser, error } = await supabase
-        .from('mc_users')
-        .select('*')
-        .eq('login_username', username)
-        .eq('status', 'approved')
-        .single();
+      // Use RPC to verify credentials securely (bypassing RLS for anonymous check)
+      const { data, error } = await supabase.rpc('verify_mc_login', {
+        p_username: username,
+        p_password: password
+      });
 
-      if (error || !mcUser) {
-        throw new Error('Invalid username or account not approved.');
+      if (error || !data || data.length === 0) {
+        throw new Error('Invalid username or password, or account not approved.');
       }
 
-      // Simple password check (in production, use proper hashing)
-      if (mcUser.password_hash !== password && mcUser.temp_password !== password) {
-        throw new Error('Invalid password.');
-      }
+      const mcUser = data[0];
 
       // Check if using temp password
-      if (mcUser.temp_password === password) {
+      if (mcUser.needs_password_change) {
         toast({
           title: 'Password Change Required',
           description: 'Please change your temporary password.',
@@ -78,7 +73,7 @@ export default function MCAuth() {
         title: 'Success',
         description: 'Logged in successfully!',
       });
-      
+
       navigate('/mc-dashboard');
     } catch (error: any) {
       toast({
@@ -124,15 +119,16 @@ export default function MCAuth() {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('mc_users')
-        .update({ 
-          password_hash: newPassword, 
-          temp_password: null 
-        })
-        .eq('login_username', username);
+      // Use RPC to update password (p_old_password ensures security)
+      const { data, error } = await supabase.rpc('update_mc_password', {
+        p_username: username,
+        p_old_password: password,
+        p_new_password: newPassword
+      });
 
-      if (error) throw error;
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to change password. Old password may be incorrect.');
+      }
 
       toast({
         title: 'Password Changed',
@@ -209,11 +205,11 @@ export default function MCAuth() {
           </Button>
           <CardTitle className="text-2xl font-bold text-center">MC Sign In</CardTitle>
           <CardDescription className="text-center">
-            {mode === 'login' 
+            {mode === 'login'
               ? 'Sign in to access MC portal'
               : mode === 'change-password'
-              ? 'Change your temporary password'
-              : 'Reset your password'
+                ? 'Change your temporary password'
+                : 'Reset your password'
             }
           </CardDescription>
         </CardHeader>
