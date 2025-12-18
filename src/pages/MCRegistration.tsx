@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Upload, User, Phone, Mail, Building, Home } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload, User, Phone, Mail, Building, Home, Check } from 'lucide-react';
 
 const INTEREST_GROUPS = [
   'Finance',
@@ -286,22 +286,29 @@ export default function MCRegistration() {
             <div className="space-y-4">
               <Label>Interest Groups * (Select at least one)</Label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {INTEREST_GROUPS.map((interest) => (
-                  <div
-                    key={interest}
-                    className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${selectedInterests.includes(interest)
+                {INTEREST_GROUPS.map((interest) => {
+                  const isSelected = selectedInterests.includes(interest);
+                  return (
+                    <div
+                      key={interest}
+                      className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${isSelected
                         ? 'bg-primary/10 border-primary'
                         : 'bg-card border-border hover:bg-muted'
-                      }`}
-                    onClick={() => toggleInterest(interest)}
-                  >
-                    <Checkbox
-                      checked={selectedInterests.includes(interest)}
-                      className="pointer-events-none"
-                    />
-                    <span className="text-sm">{interest}</span>
-                  </div>
-                ))}
+                        }`}
+                      onClick={() => toggleInterest(interest)}
+                    >
+                      <div
+                        className={`h-4 w-4 shrink-0 rounded-sm border flex items-center justify-center ${isSelected
+                          ? 'bg-primary border-primary text-primary-foreground'
+                          : 'border-primary'
+                          }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </div>
+                      <span className="text-sm">{interest}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
