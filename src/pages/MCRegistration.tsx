@@ -57,7 +57,7 @@ export default function MCRegistration() {
   };
 
   const toggleInterest = (interest: string) => {
-    setSelectedInterests(prev => 
+    setSelectedInterests(prev =>
       prev.includes(interest)
         ? prev.filter(i => i !== interest)
         : [...prev, interest]
@@ -100,7 +100,7 @@ export default function MCRegistration() {
       // Upload photo first
       const fileExt = photoFile.name.split('.').pop();
       const fileName = `${Date.now()}_${name.replace(/\s+/g, '_')}.${fileExt}`;
-      
+
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('mc-photos')
         .upload(fileName, photoFile);
@@ -289,16 +289,15 @@ export default function MCRegistration() {
                 {INTEREST_GROUPS.map((interest) => (
                   <div
                     key={interest}
-                    className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedInterests.includes(interest)
+                    className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${selectedInterests.includes(interest)
                         ? 'bg-primary/10 border-primary'
                         : 'bg-card border-border hover:bg-muted'
-                    }`}
+                      }`}
                     onClick={() => toggleInterest(interest)}
                   >
                     <Checkbox
                       checked={selectedInterests.includes(interest)}
-                      onCheckedChange={() => toggleInterest(interest)}
+                      className="pointer-events-none"
                     />
                     <span className="text-sm">{interest}</span>
                   </div>
