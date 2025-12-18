@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, AlertCircle, FileText, History, Edit } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertCircle, FileText, History, Edit, Users } from 'lucide-react';
+import MCApprovals from '@/components/MCApprovals';
 import {
   Table,
   TableBody,
@@ -146,6 +147,19 @@ interface SavingsTracking {
     investment_name: string;
     investment_type: string;
   } | null;
+}
+
+interface MCUser {
+  id: string;
+  name: string;
+  email: string;
+  tower_no: string;
+  unit_no: string;
+  contact_number: string;
+  photo_url: string;
+  interest_groups: string[];
+  status: string;
+  created_at: string;
 }
 
 export default function Approvals() {
@@ -1148,7 +1162,7 @@ export default function Approvals() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-4xl grid-cols-6">
+        <TabsList className="grid w-full max-w-5xl grid-cols-7">
           <TabsTrigger value="expenses">
             Expenses ({pendingExpenses.length})
           </TabsTrigger>
@@ -1167,7 +1181,15 @@ export default function Approvals() {
           <TabsTrigger value="corrections">
             Corrections ({correctionRequests.length})
           </TabsTrigger>
+          <TabsTrigger value="mc">
+            <Users className="h-4 w-4 mr-1" />
+            MC
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="mc" className="mt-6">
+          <MCApprovals />
+        </TabsContent>
 
         <TabsContent value="cam" className="mt-6">
           <Card>

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
 import Auth from "./pages/Auth";
+import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import BudgetUpload from "./pages/BudgetUpload";
 import IncomeBudgetUpload from "./pages/IncomeBudgetUpload";
@@ -23,6 +24,9 @@ import MissingDataReport from "./pages/MissingDataReport";
 import SportsIncome from "./pages/SportsIncome";
 import CAMReports from "./pages/CAMReports";
 import Savings from "./pages/Savings";
+import MCRegistration from "./pages/MCRegistration";
+import MCAuth from "./pages/MCAuth";
+import MCDashboard from "./pages/MCDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,17 +39,11 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <Dashboard />
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/mc-auth" element={<MCAuth />} />
+            <Route path="/mc-register" element={<MCRegistration />} />
+            <Route path="/mc-dashboard" element={<MCDashboard />} />
             <Route
               path="/dashboard"
               element={
