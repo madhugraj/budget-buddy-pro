@@ -21,6 +21,7 @@ interface NotificationCounts {
   pendingSavings: number;
   pendingSavingsTracking: number;
   maturingSavings: number;
+  pendingMC: number;
 }
 
 export function NotificationBell() {
@@ -35,15 +36,16 @@ export function NotificationBell() {
     pendingSavings: 0,
     pendingSavingsTracking: 0,
     maturingSavings: 0,
+    pendingMC: 0,
   });
   const [isOpen, setIsOpen] = useState(false);
 
-  const totalCount = counts.pendingExpenses + counts.pendingIncome + counts.correctionRequests + counts.pendingPettyCash + counts.pendingCAM + counts.pendingSavings + counts.pendingSavingsTracking + counts.maturingSavings;
+  const totalCount = counts.pendingExpenses + counts.pendingIncome + counts.correctionRequests + counts.pendingPettyCash + counts.pendingCAM + counts.pendingSavings + counts.pendingSavingsTracking + counts.maturingSavings + counts.pendingMC;
 
   useEffect(() => {
     if (userRole === 'treasurer') {
       loadNotifications();
-      
+
       // Poll every 30 seconds
       const interval = setInterval(loadNotifications, 30000);
       return () => clearInterval(interval);
@@ -94,6 +96,12 @@ export function NotificationBell() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'submitted');
 
+      // Fetch pending MC registrations
+      const { count: mcCount } = await supabase
+        .from('mc_users')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
       // Fetch maturing savings (within 30 days)
       const today = new Date();
       const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -114,6 +122,7 @@ export function NotificationBell() {
         pendingSavings: savingsCount || 0,
         pendingSavingsTracking: savingsTrackingCount || 0,
         maturingSavings: maturingCount || 0,
+        pendingMC: mcCount || 0,
       });
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -136,7 +145,7 @@ export function NotificationBell() {
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {totalCount > 0 && (
-            <Badge 
+            <Badge
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
               variant="destructive"
             >
@@ -164,7 +173,7 @@ export function NotificationBell() {
                   <Badge variant="secondary">{counts.pendingExpenses}</Badge>
                 </button>
               )}
-              
+
               {counts.pendingIncome > 0 && (
                 <button
                   onClick={() => handleNavigate('income')}
@@ -179,7 +188,7 @@ export function NotificationBell() {
                   <Badge variant="secondary">{counts.pendingIncome}</Badge>
                 </button>
               )}
-              
+
               {counts.correctionRequests > 0 && (
                 <button
                   onClick={() => handleNavigate('corrections')}
@@ -240,6 +249,21 @@ export function NotificationBell() {
                 </button>
               )}
 
+              {counts.pendingMC > 0 && (
+                <button
+                  onClick={() => handleNavigate('mc-approvals')}
+                  className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                >
+                  <div>
+                    <div className="font-medium">Pending MC Approvals</div>
+                    <div className="text-sm text-muted-foreground">
+                      {counts.pendingMC} MC registration{counts.pendingMC !== 1 ? 's' : ''} awaiting approval
+                    </div>
+                  </div>
+                  <Badge variant="secondary">{counts.pendingMC}</Badge>
+                </button>
+              )}
+
               {counts.maturingSavings > 0 && (
                 <button
                   onClick={() => handleNavigate('savings')}
@@ -254,7 +278,7 @@ export function NotificationBell() {
                   <Badge variant="outline" className="border-warning text-warning">{counts.maturingSavings}</Badge>
                 </button>
               )}
-              
+
               {totalCount === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   No pending approvals
@@ -262,10 +286,10 @@ export function NotificationBell() {
               )}
             </div>
           </ScrollArea>
-          
+
           {totalCount > 0 && (
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               variant="outline"
               onClick={() => handleNavigate('expenses')}
             >
