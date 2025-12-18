@@ -134,6 +134,11 @@ export function NotificationBell() {
     navigate(`/approvals?tab=${tab}`);
   };
 
+  const handleMCNavigate = () => {
+    setIsOpen(false);
+    navigate(`/approvals?tab=mc`);
+  };
+
   // Only show for treasurer
   if (userRole !== 'treasurer') {
     return null;
@@ -251,7 +256,7 @@ export function NotificationBell() {
 
               {counts.pendingMC > 0 && (
                 <button
-                  onClick={() => handleNavigate('mc-approvals')}
+                  onClick={() => handleNavigate('mc')}
                   className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors text-left"
                 >
                   <div>

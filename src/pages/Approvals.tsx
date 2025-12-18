@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, XCircle, AlertCircle, FileText, History, Edit, Users } from 'lucide-react';
 import MCApprovals from '@/components/MCApprovals';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Table,
   TableBody,
@@ -194,10 +195,16 @@ export default function Approvals() {
   const [selectedTrackingIds, setSelectedTrackingIds] = useState<Set<string>>(new Set());
   const [correctionReason, setCorrectionReason] = useState('');
   const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false);
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('expenses');
   const { toast } = useToast();
 
   useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+
     loadApprovals();
 
     // Poll for updates every 30 seconds
@@ -206,7 +213,7 @@ export default function Approvals() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [searchParams]);
 
 
   const loadApprovals = async () => {

@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
@@ -28,20 +29,30 @@ interface MCUser {
   interest_groups: string[];
   status: string;
   created_at: string;
+  login_username?: string;
+  temp_password?: string;
 }
 
 export default function MCApprovals() {
   const [pendingMC, setPendingMC] = useState<MCUser[]>([]);
+  const [approvedMC, setApprovedMC] = useState<MCUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [selectedMC, setSelectedMC] = useState<MCUser | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
   const { toast } = useToast();
 
   useEffect(() => {
-    loadPendingMC();
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([loadPendingMC(), loadApprovedMC()]);
+    setLoading(false);
+  };
 
   const loadPendingMC = async () => {
     try {
@@ -54,14 +65,22 @@ export default function MCApprovals() {
       if (error) throw error;
       setPendingMC(data || []);
     } catch (error: any) {
-      console.error('Error loading MC users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load pending MC registrations',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+      console.error('Error loading pending MC users:', error);
+    }
+  };
+
+  const loadApprovedMC = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('mc_users')
+        .select('*')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setApprovedMC(data || []);
+    } catch (error: any) {
+      console.error('Error loading approved MC users:', error);
     }
   };
 
@@ -76,10 +95,10 @@ export default function MCApprovals() {
 
       toast({
         title: 'MC User Approved',
-        description: `${mcUser.name} has been approved. Login credentials sent to their email.`,
+        description: `${mcUser.name} has been approved. Credentials generated.`,
       });
 
-      loadPendingMC();
+      loadData();
       setSelectedMC(null);
     } catch (error: any) {
       toast({
@@ -94,14 +113,14 @@ export default function MCApprovals() {
 
   const handleReject = async () => {
     if (!selectedMC) return;
-    
+
     setProcessing(true);
     try {
       const { error } = await supabase.functions.invoke('approve-mc-user', {
-        body: { 
-          mc_user_id: selectedMC.id, 
+        body: {
+          mc_user_id: selectedMC.id,
           action: 'reject',
-          rejection_reason: rejectionReason 
+          rejection_reason: rejectionReason
         }
       });
 
@@ -112,7 +131,7 @@ export default function MCApprovals() {
         description: `${selectedMC.name}'s registration has been rejected.`,
       });
 
-      loadPendingMC();
+      loadData();
       setSelectedMC(null);
       setShowRejectDialog(false);
       setRejectionReason('');
@@ -139,80 +158,160 @@ export default function MCApprovals() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending MC Registrations</CardTitle>
-          <CardDescription>Review and approve Management Committee member registrations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {pendingMC.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No pending MC registrations
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {pendingMC.map((mc) => (
-                <div
-                  key={mc.id}
-                  className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarImage src={mc.photo_url} alt={mc.name} />
-                    <AvatarFallback><User className="h-6 w-6" /></AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1">
-                    <div className="font-semibold">{mc.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Tower {mc.tower_no}, Unit {mc.unit_no} • {mc.email}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {mc.interest_groups.slice(0, 3).map((group) => (
-                        <Badge key={group} variant="outline" className="text-xs">
-                          {group}
-                        </Badge>
-                      ))}
-                      {mc.interest_groups.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{mc.interest_groups.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
+      <div className="flex flex-col gap-6">
+        {/* Email Policy Alert */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800 text-sm">
+          <p className="font-semibold mb-1">Important: Email Delivery Status</p>
+          <p>
+            Currently, automated emails (credentials & password resets) are only delivered to the administration's verified email address due to Resend's onboarding restrictions.
+          </p>
+          <p className="mt-1 font-medium">To fix this: Please verify your domain in the Resend dashboard and update the "from" address in Supabase Edge Functions.</p>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-sm">
+            <TabsTrigger value="pending">Pending ({pendingMC.length})</TabsTrigger>
+            <TabsTrigger value="approved">Approved ({approvedMC.length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Registrations</CardTitle>
+                <CardDescription>Review and approve member requests</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingMC.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No pending MC registrations
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedMC(mc)}
-                    >
-                      View
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => {
-                        setSelectedMC(mc);
-                        setShowRejectDialog(true);
-                      }}
-                      disabled={processing}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleApprove(mc)}
-                      disabled={processing}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Approve
-                    </Button>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingMC.map((mc) => (
+                      <div
+                        key={mc.id}
+                        className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={mc.photo_url} alt={mc.name} />
+                          <AvatarFallback><User className="h-6 w-6" /></AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 space-y-1">
+                          <div className="font-semibold">{mc.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            Tower {mc.tower_no}, Unit {mc.unit_no} • {mc.email}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {mc.interest_groups.slice(0, 3).map((group) => (
+                              <Badge key={group} variant="outline" className="text-xs">
+                                {group}
+                              </Badge>
+                            ))}
+                            {mc.interest_groups.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{mc.interest_groups.length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setSelectedMC(mc)}>View</Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => { setSelectedMC(mc); setShowRejectDialog(true); }}
+                            disabled={processing}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" onClick={() => handleApprove(mc)} disabled={processing}>
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="approved" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Approved Members</CardTitle>
+                <CardDescription>View credentials and manage member access</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {approvedMC.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No approved MC members
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {approvedMC.map((mc) => (
+                      <div
+                        key={mc.id}
+                        className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 border rounded-lg bg-card"
+                      >
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={mc.photo_url} alt={mc.name} />
+                          <AvatarFallback><User className="h-5 w-5" /></AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold truncate">{mc.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{mc.email}</div>
+                        </div>
+
+                        <div className="flex flex-col gap-1 flex-1">
+                          <div className="text-xs text-muted-foreground">Login Username:</div>
+                          <div className="text-sm font-mono bg-muted px-2 py-1 rounded select-all truncate">
+                            {mc.login_username || 'Not set'}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1 flex-1">
+                          <div className="text-xs text-muted-foreground">Temp Password:</div>
+                          <div className="text-sm font-mono bg-muted px-2 py-1 rounded select-all truncate">
+                            {mc.temp_password || '---'}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                setProcessing(true);
+                                const { error } = await supabase.functions.invoke('mc-forgot-password', {
+                                  body: { email: mc.email }
+                                });
+                                if (error) throw error;
+                                toast({ title: 'Success', description: 'Temporary password reset successfully.' });
+                                loadApprovedMC();
+                              } catch (err: any) {
+                                toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                              } finally {
+                                setProcessing(false);
+                              }
+                            }}
+                            disabled={processing}
+                          >
+                            Reset Password
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* View Details Dialog */}
       <Dialog open={!!selectedMC && !showRejectDialog} onOpenChange={(open) => !open && setSelectedMC(null)}>
