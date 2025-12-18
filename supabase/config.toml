@@ -2,3 +2,9 @@ project_id = "ujnxljbaapuvpnjdkick"
 
 [functions.send-savings-notification]
 verify_jwt = false
+
+[functions.approve-mc-user]
+verify_jwt = true
+
+[functions.mc-forgot-password]
+verify_jwt = false

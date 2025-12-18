@@ -498,6 +498,66 @@ export type Database = {
           },
         ]
       }
+      mc_users: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          contact_number: string
+          created_at: string
+          email: string
+          id: string
+          interest_groups: string[]
+          login_username: string | null
+          name: string
+          password_hash: string | null
+          photo_url: string
+          rejection_reason: string | null
+          status: string
+          temp_password: string | null
+          tower_no: string
+          unit_no: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          contact_number: string
+          created_at?: string
+          email: string
+          id?: string
+          interest_groups?: string[]
+          login_username?: string | null
+          name: string
+          password_hash?: string | null
+          photo_url: string
+          rejection_reason?: string | null
+          status?: string
+          temp_password?: string | null
+          tower_no: string
+          unit_no: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          contact_number?: string
+          created_at?: string
+          email?: string
+          id?: string
+          interest_groups?: string[]
+          login_username?: string | null
+          name?: string
+          password_hash?: string | null
+          photo_url?: string
+          rejection_reason?: string | null
+          status?: string
+          temp_password?: string | null
+          tower_no?: string
+          unit_no?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
