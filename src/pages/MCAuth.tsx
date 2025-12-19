@@ -35,17 +35,18 @@ export default function MCAuth() {
     setLoading(true);
 
     try {
-      // Use RPC to verify credentials securely (bypassing RLS for anonymous check)
-      const { data, error } = await supabase.rpc('verify_mc_login', {
+      // Use RPC to verify credentials (table-based MC auth)
+      // NOTE: This function exists in the database, but isn't included in the generated TS types.
+      const { data, error } = await (supabase as any).rpc('verify_mc_login', {
         p_username: username,
-        p_password: password
+        p_password: password,
       });
 
-      if (error || !data || data.length === 0) {
+      const mcUser = (data?.[0] ?? null) as any;
+
+      if (error || !mcUser) {
         throw new Error('Invalid username or password, or account not approved.');
       }
-
-      const mcUser = data[0];
 
       // Check if using temp password
       if (mcUser.needs_password_change) {
@@ -120,10 +121,11 @@ export default function MCAuth() {
 
     try {
       // Use RPC to update password (p_old_password ensures security)
-      const { data, error } = await supabase.rpc('update_mc_password', {
+      // NOTE: This function exists in the database, but isn't included in the generated TS types.
+      const { data, error } = await (supabase as any).rpc('update_mc_password', {
         p_username: username,
         p_old_password: password,
-        p_new_password: newPassword
+        p_new_password: newPassword,
       });
 
       if (error || !data) {
