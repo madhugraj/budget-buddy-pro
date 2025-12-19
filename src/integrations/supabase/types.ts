@@ -993,6 +993,29 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_mc_password: {
+        Args: {
+          p_new_password: string
+          p_old_password: string
+          p_username: string
+        }
+        Returns: boolean
+      }
+      verify_mc_login: {
+        Args: { p_password: string; p_username: string }
+        Returns: {
+          email: string
+          id: string
+          interest_groups: string[]
+          login_username: string
+          name: string
+          needs_password_change: boolean
+          photo_url: string
+          status: string
+          tower_no: string
+          unit_no: string
+        }[]
+      }
     }
     Enums: {
       user_role: "treasurer" | "accountant" | "lead" | "office_assistant"
