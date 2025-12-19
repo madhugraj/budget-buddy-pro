@@ -759,35 +759,49 @@ export default function Dashboard() {
   }
   return <div className="space-y-6 md:space-y-10 animate-fade-in max-w-[1600px] mx-auto">
     {/* Hero Header Section */}
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 p-8 md:p-12 border border-primary/10">
-      <div className="relative z-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-3 bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-indigo-950 text-center md:text-6xl">
+    <div className="relative overflow-hidden rounded-2xl p-8 md:p-12 border border-primary/10 shadow-2xl min-h-[300px] flex items-center justify-center">
+      {/* Background Image with Overlay */}
+      <div
+        className="absolute inset-0 z-0 scale-105"
+        style={{
+          backgroundImage: 'url("/background-image.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'brightness(0.4) saturate(1.2)'
+        }}
+      />
+
+      {/* Animated Gradient Overlay */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-indigo-950/40 via-transparent to-primary/20" />
+
+      <div className="relative z-10 w-full">
+        <h1 className="text-4xl font-bold tracking-tight mb-4 text-white drop-shadow-2xl text-center md:text-7xl lg:text-8xl animate-in fade-in slide-in-from-top-4 duration-1000">
           Prestige Bella Vista
         </h1>
-        <p className="text-xl md:text-2xl mb-6 text-center font-normal text-secondary-foreground">
-          Expense Management System
+        <p className="text-xl md:text-2xl lg:text-3xl mb-8 text-center font-medium text-white/90 drop-shadow-lg animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
+          Financial Management Portal
         </p>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-sm">
-          {userRole && <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm md:text-base animate-in fade-in duration-1000 delay-500">
+          {userRole && <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 shadow-xl">
             <RoleBadge role={userRole} size="sm" />
-            <span className="text-muted-foreground">
-              {userRole === 'treasurer' && 'Full system access'}
-              {userRole === 'accountant' && 'Can add expenses'}
-              {userRole === 'lead' && 'Can manage petty cash'}
-              {userRole === 'general' && 'View-only access'}
+            <span className="text-white font-medium">
+              {userRole === 'treasurer' && 'Full System Access'}
+              {userRole === 'accountant' && 'Management Access'}
+              {userRole === 'lead' && 'Petty Cash Lead'}
+              {userRole === 'general' && 'View-only Access'}
             </span>
           </div>}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-background/50 backdrop-blur-sm rounded-full border border-border">
-            <span className="text-muted-foreground">Fiscal Year</span>
-            <span className="font-semibold text-foreground">2025-26</span>
+          <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 shadow-xl">
+            <span className="text-white/80">Fiscal Year</span>
+            <span className="font-bold text-white">2025-26</span>
           </div>
         </div>
       </div>
 
-      {/* Decorative Elements */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-0"></div>
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-accent/10 rounded-full blur-3xl -z-0"></div>
+      {/* Modern Decorative Accents */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/20 rounded-full blur-[120px] -z-0" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-accent/20 rounded-full blur-[100px] -z-0" />
     </div>
 
     {/* Budget Meter - Hero Section */}
