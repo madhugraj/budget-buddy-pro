@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, User } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, User, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Dialog,
@@ -139,6 +139,36 @@ export default function MCApprovals() {
       toast({
         title: 'Error',
         description: error.message || 'Failed to reject MC user',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteMC = async (mcUser: MCUser) => {
+    const confirmed = window.confirm(`Are you sure you want to permanently delete MC user "${mcUser.name}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('mc_users')
+        .delete()
+        .eq('id', mcUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'User Deleted',
+        description: `MC user ${mcUser.name} has been permanently removed.`,
+      });
+
+      loadData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete MC user',
         variant: 'destructive',
       });
     } finally {
@@ -301,6 +331,15 @@ export default function MCApprovals() {
                             disabled={processing}
                           >
                             Reset Password
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteMC(mc)}
+                            disabled={processing}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
