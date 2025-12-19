@@ -4,8 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { LogOut, FileText, Building, User } from 'lucide-react';
+import { LogOut, FileText, Building, User, LayoutDashboard } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Reports from './Reports';
+import { ExportCAM } from '@/components/ExportCAM';
+import Dashboard from './Dashboard'; // We can use Dashboard component or just the charts
 
 interface MCUser {
   id: string;
@@ -48,119 +51,66 @@ export default function MCDashboard() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-10 w-10">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10 border-2 border-primary/20">
               <AvatarImage src={mcUser.photo_url} alt={mcUser.name} />
-              <AvatarFallback>{mcUser.name.charAt(0)}</AvatarFallback>
+              <AvatarFallback className="bg-primary/10 text-primary">{mcUser.name.charAt(0)}</AvatarFallback>
             </Avatar>
             <div>
-              <h1 className="font-semibold">{mcUser.name}</h1>
-              <p className="text-sm text-muted-foreground">
-                Tower {mcUser.tower_no}, Unit {mcUser.unit_no}
+              <h1 className="font-bold text-lg leading-none">{mcUser.name}</h1>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">
+                MC Member • Tower {mcUser.tower_no}, Unit {mcUser.unit_no}
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border text-xs font-semibold">
+              <span className="text-muted-foreground">Fiscal Year</span>
+              <span className="text-foreground">2025-26</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto p-4">
-        <Tabs defaultValue="reports" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="reports">
-              <FileText className="h-4 w-4 mr-2" />
+      <main className="max-w-7xl mx-auto p-4 md:p-6 pb-20">
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full max-w-xl grid-cols-3 bg-muted/50 p-1">
+            <TabsTrigger value="overview" className="gap-2">
+              <LayoutDashboard className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-2">
+              <FileText className="h-4 w-4" />
               Reports
             </TabsTrigger>
-            <TabsTrigger value="cam">
-              <Building className="h-4 w-4 mr-2" />
+            <TabsTrigger value="cam" className="gap-2">
+              <Building className="h-4 w-4" />
               CAM & Facility
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="reports" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Financial Reports</CardTitle>
-                <CardDescription>
-                  View society's financial reports and statements
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Income Report</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        View income from various sources
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Expense Report</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        View society expenses breakdown
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">GST Report</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        View GST collected and paid
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
+          <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-500">
+            {/* Reuse standard dashboard charts */}
+            <Dashboard />
+          </TabsContent>
+
+          <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-500">
+            <Card className="border-none shadow-lg">
+              <CardContent className="p-0">
+                <Reports />
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="cam" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>CAM & Facility Management</CardTitle>
-                <CardDescription>
-                  View CAM collection status and facility information
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">CAM Collection Status</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        View tower-wise CAM collection status
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Facility Updates</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">
-                        View facility maintenance updates
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="cam" className="space-y-6 animate-in fade-in duration-500">
+            <ExportCAM />
           </TabsContent>
         </Tabs>
 
