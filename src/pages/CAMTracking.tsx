@@ -136,6 +136,7 @@ export default function CAMTracking() {
   const [discrepancyCount, setDiscrepancyCount] = useState(0);
   const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const isMC = !!localStorage.getItem('mc_user');
 
   const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
 
@@ -1153,7 +1154,7 @@ export default function CAMTracking() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3].map(month => {
+                      {[3, 2, 1, 12, 11, 10, 9, 8, 7, 6, 5, 4].map(month => {
                         const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
                         const defaulterReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && r.report_type === 'defaulters_list');
                         const reconReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && r.report_type === 'recon_list');
@@ -1171,7 +1172,7 @@ export default function CAMTracking() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">Not uploaded</span>
                                 )}
-                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer') && (
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && (
                                   <div className="relative">
                                     <input
                                       type="file"
@@ -1196,7 +1197,7 @@ export default function CAMTracking() {
                                 ) : (
                                   <span className="text-xs text-muted-foreground">Not uploaded</span>
                                 )}
-                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer') && (
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && (
                                   <div className="relative">
                                     <input
                                       type="file"

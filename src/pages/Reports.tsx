@@ -58,7 +58,7 @@ export default function Reports() {
           {canAccessGST && <TabsTrigger value="gstr1">GSTR-1 Filing</TabsTrigger>}
           {canAccessBudget && <TabsTrigger value="budget">Budget</TabsTrigger>}
           {canAccessPettyCash && <TabsTrigger value="petty-cash">Petty Cash</TabsTrigger>}
-          {canAccessCAM && <TabsTrigger value="cam">CAM</TabsTrigger>}
+          {canAccessCAM && !isMC && <TabsTrigger value="cam">CAM</TabsTrigger>}
         </TabsList>
 
         {canAccessExpense && (

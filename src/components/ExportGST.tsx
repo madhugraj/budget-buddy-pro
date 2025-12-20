@@ -31,6 +31,7 @@ interface GSTRow {
 }
 
 export function ExportGST() {
+  const isMC = !!localStorage.getItem('mc_user');
   const [loading, setLoading] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -70,12 +71,12 @@ export function ExportGST() {
     // Filter income by date range
     const filteredIncome = (incomeData || []).filter((i: any) => {
       if (!i.gst_amount || i.gst_amount <= 0) return false;
-      
+
       const fiscalYear = i.fiscal_year;
       const month = i.month;
       let year = fiscalYear === 'FY25-26' ? (month >= 4 ? 2025 : 2026) :
-                 fiscalYear === 'FY24-25' ? (month >= 4 ? 2024 : 2025) : 2025;
-      
+        fiscalYear === 'FY24-25' ? (month >= 4 ? 2024 : 2025) : 2025;
+
       const incomeDate = new Date(year, month - 1, 1);
       if (dateFrom && incomeDate < dateFrom) return false;
       if (dateTo && incomeDate > dateTo) return false;
@@ -133,7 +134,7 @@ export function ExportGST() {
       doc.text('GST Report', 14, 15);
       doc.setFontSize(10);
       doc.text(`Generated: ${format(new Date(), 'dd/MM/yyyy')}`, 14, 22);
-      
+
       autoTable(doc, {
         startY: 30,
         head: [['Date', 'Type', 'Category', 'Item', 'Base', 'GST', 'Total']],
@@ -182,20 +183,20 @@ export function ExportGST() {
 
   const groupedData = useMemo(() => {
     if (groupBy === 'none') return null;
-    
+
     const groups: Record<string, { base: number; gst: number; total: number; count: number }> = {};
     filteredData.forEach(row => {
       const key = groupBy === 'type' ? row.type :
-                  groupBy === 'category' ? row.category :
-                  `${row.type} • ${row.category}`;
-      
+        groupBy === 'category' ? row.category :
+          `${row.type} • ${row.category}`;
+
       if (!groups[key]) groups[key] = { base: 0, gst: 0, total: 0, count: 0 };
       groups[key].base += row.baseAmount;
       groups[key].gst += row.gst;
       groups[key].total += row.totalAmount;
       groups[key].count += 1;
     });
-    
+
     return Object.entries(groups).sort((a, b) => b[1].gst - a[1].gst);
   }, [filteredData, groupBy]);
 
@@ -259,26 +260,28 @@ export function ExportGST() {
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="mr-1.5 h-4 w-4" />}
           View
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" disabled={loading}>
-              <Download className="mr-1.5 h-4 w-4" />
-              Export
-              <ChevronDown className="ml-1 h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportPDF}>
-              <FileText className="mr-2 h-4 w-4" /> PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('excel')}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')}>
-              <FileText className="mr-2 h-4 w-4" /> CSV
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!isMC && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={loading}>
+                <Download className="mr-1.5 h-4 w-4" />
+                Export
+                <ChevronDown className="ml-1 h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF}>
+                <FileText className="mr-2 h-4 w-4" /> PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('excel')}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                <FileText className="mr-2 h-4 w-4" /> CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Summary */}

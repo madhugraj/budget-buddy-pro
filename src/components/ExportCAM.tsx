@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, Download, Building2 } from 'lucide-react';
+import { Upload, Download, Building2, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -61,21 +61,25 @@ export function ExportCAM() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedQuarter, setSelectedQuarter] = useState(1);
   const [camData, setCamData] = useState<CAMRecord[]>([]);
+  const [mcUser, setMcUser] = useState<any>(null);
+  const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
+  const years = Array.from({ length: 2 }, (_, i) => 2024 + i);
 
   useEffect(() => {
+    const stored = localStorage.getItem('mc_user');
+    if (stored) {
+      setMcUser(JSON.parse(stored));
+    }
     fetchCAMData();
+    fetchMonthlyReports();
   }, [selectedYear, selectedQuarter]);
-
-  const getCalendarYear = () => {
-    return selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
-  };
 
   const fetchCAMData = async () => {
     setLoading(true);
     try {
-      const calendarYear = getCalendarYear();
+      const calendarYear = selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
       const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
       const months = quarterConfig?.months || [];
 
@@ -87,13 +91,100 @@ export function ExportCAM() {
 
       if (error) throw error;
 
-      // Filter to relevant months
       const filteredData = (data || []).filter(d => d.month && months.includes(d.month)) as unknown as CAMRecord[];
       setCamData(filteredData);
     } catch (error: any) {
       toast.error('Failed to fetch CAM data: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMonthlyReports = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cam_monthly_reports')
+        .select('*')
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by year and month
+      const grouped: Record<string, any> = {};
+      (data || []).forEach(row => {
+        const key = `${row.year}-${row.month}`;
+        if (!grouped[key]) {
+          grouped[key] = {
+            id: key,
+            year: row.year,
+            month: row.month,
+            status: row.status || 'draft',
+            defaulters_list_url: null,
+            recon_list_url: null
+          };
+        }
+        if (row.report_type === 'defaulters_list') {
+          grouped[key].defaulters_list_url = row.document_url;
+        } else if (row.report_type === 'recon_list') {
+          grouped[key].recon_list_url = row.document_url;
+        }
+      });
+
+      setMonthlyReports(Object.values(grouped));
+    } catch (error: any) {
+      console.error('Error fetching monthly reports:', error);
+    }
+  };
+
+  const handleReportUpload = async (event: React.ChangeEvent<HTMLInputElement>, month: number, year: number, type: 'defaulters_list' | 'recon_list') => {
+    const file = event.target.files?.[0];
+    if (!file || !mcUser) return;
+
+    try {
+      setSaving(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `monthly_reports/${year}/${month}/${type}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('cam')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('cam_monthly_reports')
+        .upsert({
+          year: year,
+          month: month,
+          report_type: type,
+          document_url: fileName,
+          uploaded_by: mcUser.id
+        }, { onConflict: 'year,month,report_type' });
+
+      if (dbError) throw dbError;
+
+      toast.success(`${type === 'defaulters_list' ? 'Defaulters List' : 'Recon List'} uploaded for ${MONTH_NAMES[month]}`);
+      fetchMonthlyReports();
+    } catch (error: any) {
+      toast.error('Upload failed: ' + error.message);
+    } finally {
+      setSaving(true); // Small delay to let DB catch up
+      setTimeout(() => setSaving(false), 500);
+      event.target.value = '';
+    }
+  };
+
+  const downloadReport = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('cam')
+        .createSignedUrl(path, 3600);
+
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (error: any) {
+      toast.error('Download failed: ' + error.message);
     }
   };
 
@@ -115,7 +206,6 @@ export function ExportCAM() {
       };
     });
 
-    // Use the last month's data for each tower
     camData.forEach(record => {
       if (record.month && months.includes(record.month)) {
         const lastMonthInQuarter = Math.max(...months);
@@ -159,7 +249,6 @@ export function ExportCAM() {
   const exportToPDF = () => {
     const summary = getQuarterSummary();
     const doc = new jsPDF();
-
     doc.setFontSize(16);
     doc.text(`CAM Collection Report - FY${selectedYear} Q${selectedQuarter}`, 14, 20);
 
@@ -182,7 +271,6 @@ export function ExportCAM() {
       headStyles: { fillColor: [59, 130, 246] }
     });
 
-    // Add summary at the bottom
     const totalPaid = summary.reduce((sum, r) => sum + r.paidFlats, 0);
     const totalPending = summary.reduce((sum, r) => sum + r.pendingFlats, 0);
     const totalFlats = summary.reduce((sum, r) => sum + r.totalFlats, 0);
@@ -200,17 +288,153 @@ export function ExportCAM() {
   const totalPending = summary.reduce((sum, r) => sum + r.pendingFlats, 0);
   const totalFlats = summary.reduce((sum, r) => sum + r.totalFlats, 0);
 
+  const towerStats = mcUser ? summary.find(s => s.tower === mcUser.tower_no) : null;
+
   return (
     <div className="space-y-6">
+      {/* MC Member's Tower Overview */}
+      {mcUser && towerStats && (
+        <Card className="bg-primary/5 border-primary/20 shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Building2 className="h-5 w-5" />
+              Tower {mcUser.tower_no} Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-background p-3 rounded-lg border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Residents</p>
+                <p className="text-xl font-bold">{towerStats.totalFlats}</p>
+              </div>
+              <div className="bg-background p-3 rounded-lg border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Paid Residents</p>
+                <p className="text-xl font-bold text-green-600">{towerStats.paidFlats}</p>
+              </div>
+              <div className="bg-background p-3 rounded-lg border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Pending/Defaulters</p>
+                <p className="text-xl font-bold text-red-600">{towerStats.pendingFlats}</p>
+              </div>
+              <div className="bg-background p-3 rounded-lg border">
+                <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Collection Rate</p>
+                <p className="text-xl font-bold text-primary">
+                  {((towerStats.paidFlats / towerStats.totalFlats) * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly Reports (Defaulters & Recon lists) */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            CAM Collection Report
-          </CardTitle>
+          <CardTitle className="text-lg">Download Monthly Lists</CardTitle>
+          <CardDescription>Download detailed defaulter and reconciliation lists uploaded by administration</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {monthlyReports.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-lg">
+              No monthly lists uploaded yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {monthlyReports.slice(0, 6).map((report) => (
+                <div key={report.id} className="flex flex-col p-3 border rounded-lg hover:border-primary transition-colors gap-3 relative overflow-hidden group">
+                  {saving && <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] z-10 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-semibold">{MONTH_NAMES[report.month]} {report.year}</p>
+                      <p className="text-[10px] text-muted-foreground">30th Defaulters / 20th Recon</p>
+                    </div>
+                    <Badge variant={report.status === 'final' ? 'default' : 'secondary'} className="text-[9px] h-4">
+                      {report.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-medium text-muted-foreground">Defaulters (30th)</p>
+                      <div className="flex gap-1">
+                        {report.defaulters_list_url ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 w-7 p-0 flex-shrink-0"
+                            onClick={() => downloadReport(report.defaulters_list_url)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_list')}
+                            disabled={saving}
+                          />
+                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                            <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-medium text-muted-foreground">Recon (20th)</p>
+                      <div className="flex gap-1">
+                        {report.recon_list_url ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 w-7 p-0 flex-shrink-0"
+                            onClick={() => downloadReport(report.recon_list_url)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'recon_list')}
+                            disabled={saving}
+                          />
+                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                            <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Detailed Collection Report
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={exportToExcel}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4 border-b pb-4">
             <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Fiscal Year" />
@@ -232,87 +456,76 @@ export function ExportCAM() {
                 ))}
               </SelectContent>
             </Select>
-
-            <div className="flex gap-2 ml-auto">
-              <Button variant="outline" onClick={exportToExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" onClick={exportToPDF}>
-                <Download className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-            </div>
           </div>
 
-          {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Total Flats</div>
-                <div className="text-2xl font-bold">{totalFlats.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Paid</div>
-                <div className="text-2xl font-bold text-green-600">{totalPaid.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Pending</div>
-                <div className="text-2xl font-bold text-red-600">{totalPending.toLocaleString()}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Collection Rate</div>
-                <div className="text-2xl font-bold text-primary">
-                  {totalFlats > 0 ? ((totalPaid / totalFlats) * 100).toFixed(1) : 0}%
-                </div>
-              </CardContent>
-            </Card>
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Total Assets</p>
+              <p className="text-2xl font-bold">{totalFlats}</p>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg">
+              <p className="text-sm text-green-600 mb-1 font-medium">Paid</p>
+              <p className="text-2xl font-bold text-green-700">{totalPaid}</p>
+            </div>
+            <div className="p-4 bg-red-50 rounded-lg">
+              <p className="text-sm text-red-600 mb-1 font-medium">Pending</p>
+              <p className="text-2xl font-bold text-red-700">{totalPending}</p>
+            </div>
+            <div className="p-4 bg-primary/10 rounded-lg">
+              <p className="text-sm text-primary mb-1 font-medium">Overall Rate</p>
+              <p className="text-2xl font-bold text-primary">
+                {totalFlats > 0 ? ((totalPaid / totalFlats) * 100).toFixed(1) : 0}%
+              </p>
+            </div>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tower</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Pending</TableHead>
-                    <TableHead className="text-right">Dues Cleared</TableHead>
-                    <TableHead className="text-right">Advance</TableHead>
-                    <TableHead className="text-right">CAM Recon</TableHead>
-                    <TableHead className="text-right">Rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {summary.map((row) => (
-                    <TableRow key={row.tower}>
-                      <TableCell className="font-medium">{row.tower}</TableCell>
-                      <TableCell className="text-right">{row.totalFlats}</TableCell>
-                      <TableCell className="text-right text-green-600">{row.paidFlats}</TableCell>
-                      <TableCell className="text-right text-red-600">{row.pendingFlats}</TableCell>
-                      <TableCell className="text-right">{row.duesCleared}</TableCell>
-                      <TableCell className="text-right">{row.advance}</TableCell>
-                      <TableCell className="text-right">{row.camRecon}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={row.paidFlats / row.totalFlats >= 0.9 ? 'default' : 'secondary'}>
-                          {((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%
-                        </Badge>
-                      </TableCell>
+            <div className="rounded-xl border shadow-sm">
+              <div className="max-h-[500px] overflow-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead>Tower</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Paid</TableHead>
+                      <TableHead className="text-right">Pending</TableHead>
+                      <TableHead className="text-right">Dues Clr</TableHead>
+                      <TableHead className="text-right">Advance</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {summary.map((row) => (
+                      <TableRow
+                        key={row.tower}
+                        className={mcUser?.tower_no === row.tower ? "bg-primary/5 ring-1 ring-primary/20" : ""}
+                      >
+                        <TableCell className="font-bold flex items-center gap-2">
+                          {row.tower}
+                          {mcUser?.tower_no === row.tower && <Badge variant="default" className="text-[9px] h-4 px-1">Your Tower</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right">{row.totalFlats}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">{row.paidFlats}</TableCell>
+                        <TableCell className="text-right text-red-600 font-medium">{row.pendingFlats}</TableCell>
+                        <TableCell className="text-right">{row.duesCleared}</TableCell>
+                        <TableCell className="text-right">{row.advance}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant={row.paidFlats / row.totalFlats >= 0.9 ? 'default' : 'secondary'}
+                            className={row.paidFlats / row.totalFlats >= 0.9 ? "bg-green-600" : ""}
+                          >
+                            {((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </CardContent>

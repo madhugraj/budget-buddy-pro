@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { BarChart3 } from 'lucide-react';
 
 export function ExportBudget() {
+    const isMC = !!localStorage.getItem('mc_user');
     const [loading, setLoading] = useState(false);
     const [viewExpenseData, setViewExpenseData] = useState<any[]>([]);
     const [showExpenseView, setShowExpenseView] = useState(false);
@@ -258,16 +259,20 @@ export function ExportBudget() {
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                             View
                         </Button>
-                        <Button onClick={handleExportExpensePDF} disabled={loading} variant="default" className="flex-1 min-w-[150px] bg-red-600 hover:bg-red-700">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
-                            PDF
-                        </Button>
-                        <Button onClick={() => handleExportExpense('excel')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
-                            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
-                        </Button>
-                        <Button onClick={() => handleExportExpense('csv')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
-                            <FileText className="mr-2 h-4 w-4" /> CSV
-                        </Button>
+                        {!isMC && (
+                            <>
+                                <Button onClick={handleExportExpensePDF} disabled={loading} variant="default" className="flex-1 min-w-[150px] bg-red-600 hover:bg-red-700">
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
+                                    PDF
+                                </Button>
+                                <Button onClick={() => handleExportExpense('excel')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+                                </Button>
+                                <Button onClick={() => handleExportExpense('csv')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
+                                    <FileText className="mr-2 h-4 w-4" /> CSV
+                                </Button>
+                            </>
+                        )}
                     </div>
                     {showExpenseView && viewExpenseData.length > 0 && (
                         <Card className="mt-6 border-red-100">
@@ -320,16 +325,20 @@ export function ExportBudget() {
                             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
                             View
                         </Button>
-                        <Button onClick={handleExportIncomePDF} disabled={loading} variant="default" className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700">
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
-                            PDF
-                        </Button>
-                        <Button onClick={() => handleExportIncome('excel')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
-                            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
-                        </Button>
-                        <Button onClick={() => handleExportIncome('csv')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
-                            <FileText className="mr-2 h-4 w-4" /> CSV
-                        </Button>
+                        {!isMC && (
+                            <>
+                                <Button onClick={handleExportIncomePDF} disabled={loading} variant="default" className="flex-1 min-w-[150px] bg-green-600 hover:bg-green-700">
+                                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BarChart3 className="mr-2 h-4 w-4" />}
+                                    PDF
+                                </Button>
+                                <Button onClick={() => handleExportIncome('excel')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
+                                </Button>
+                                <Button onClick={() => handleExportIncome('csv')} disabled={loading} variant="outline" className="flex-1 min-w-[150px]">
+                                    <FileText className="mr-2 h-4 w-4" /> CSV
+                                </Button>
+                            </>
+                        )}
                     </div>
                     {showIncomeView && viewIncomeData.length > 0 && (
                         <Card className="mt-6 border-green-100">

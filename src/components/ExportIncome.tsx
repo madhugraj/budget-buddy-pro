@@ -34,6 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronRight, Calculator } from 'lucide-react';
 
 export function ExportIncome() {
+    const isMC = !!localStorage.getItem('mc_user');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<string>('all');
     const [dateFrom, setDateFrom] = useState<Date | undefined>();
@@ -480,33 +481,35 @@ export function ExportIncome() {
                             View
                         </Button>
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" disabled={loading}>
-                                    <Download className="mr-1.5 h-3.5 w-3.5" />
-                                    Export
-                                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleExportPDF}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    PDF (Detailed)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleExportSummaryPDF}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    PDF (Summary)
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleExport('excel')}>
-                                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                                    Excel
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleExport('csv')}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    CSV
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        {!isMC && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" disabled={loading}>
+                                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                                        Export
+                                        <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={handleExportPDF}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        PDF (Detailed)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleExportSummaryPDF}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        PDF (Summary)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExport('excel')}>
+                                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                        Excel
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExport('csv')}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        CSV
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </CardContent>
             </Card>
