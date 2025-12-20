@@ -632,10 +632,14 @@ export default function CAMTracking() {
   const fetchMonthlyReports = async () => {
     try {
       setLoadingReports(true);
+      const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
+      const months = quarterConfig?.months || [];
+
       const { data, error } = await supabase
         .from('cam_monthly_reports')
         .select('*')
         .eq('year', selectedYear)
+        .in('month', months)
         .order('month', { ascending: false });
 
       if (error) throw error;
@@ -1211,6 +1215,16 @@ export default function CAMTracking() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FISCAL_QUARTERS.map(q => (
+                        <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="text-sm text-muted-foreground">
                     <p>Lead users upload Defaulters List on 30th and Recon List on 20th for each tower.</p>
                   </div>
@@ -1227,7 +1241,7 @@ export default function CAMTracking() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[3, 2, 1, 12, 11, 10, 9, 8, 7, 6, 5, 4].map(month => {
+                      {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.months.slice().reverse().map(month => {
                         const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
 
                         // Show reports for the currently selected tower in this tab too

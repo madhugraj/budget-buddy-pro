@@ -102,10 +102,15 @@ export function ExportCAM() {
 
   const fetchMonthlyReports = async () => {
     try {
+      const calendarYear = selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
+      const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
+      const months = quarterConfig?.months || [];
+
       let query = supabase
         .from('cam_monthly_reports')
         .select('*')
-        .eq('year', selectedYear);
+        .eq('year', selectedYear) // In our DB, we store the start year of FY
+        .in('month', months);
 
       if (mcUser) {
         query = query.eq('tower', mcUser.tower_no);
