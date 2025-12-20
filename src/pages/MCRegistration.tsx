@@ -16,6 +16,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const TOWERS = [
+  '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
+  '9A', '9B', '9C', '10', '11', '12', '13', '14', '15A', '15B',
+  '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'
+];
 
 const INTEREST_GROUPS = [
   'Finance',
@@ -272,17 +285,18 @@ export default function MCRegistration() {
 
               <div className="space-y-2">
                 <Label htmlFor="towerNo">Tower No *</Label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="towerNo"
-                    placeholder="e.g., 15"
-                    value={towerNo}
-                    onChange={(e) => setTowerNo(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
+                <Select value={towerNo} onValueChange={setTowerNo}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select your tower" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TOWERS.map((tower) => (
+                      <SelectItem key={tower} value={tower}>
+                        Tower {tower}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

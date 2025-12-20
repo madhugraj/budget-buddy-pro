@@ -102,9 +102,16 @@ export function ExportCAM() {
 
   const fetchMonthlyReports = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('cam_monthly_reports')
         .select('*')
+        .eq('year', selectedYear);
+
+      if (mcUser) {
+        query = query.eq('tower', mcUser.tower_no);
+      }
+
+      const { data, error } = await query
         .order('year', { ascending: false })
         .order('month', { ascending: false });
 
@@ -157,10 +164,11 @@ export function ExportCAM() {
         .upsert({
           year: year,
           month: month,
+          tower: mcUser.tower_no,
           report_type: type,
           document_url: fileName,
           uploaded_by: mcUser.id
-        }, { onConflict: 'year,month,report_type' });
+        }, { onConflict: 'year,month,tower,report_type' });
 
       if (dbError) throw dbError;
 
@@ -345,7 +353,7 @@ export function ExportCAM() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold">{MONTH_NAMES[report.month]} {report.year}</p>
-                      <p className="text-[10px] text-muted-foreground">30th Defaulters / 20th Recon</p>
+                      <p className="text-[10px] text-muted-foreground">Tower {mcUser?.tower_no} Reports</p>
                     </div>
                     <Badge variant={report.status === 'final' ? 'default' : 'secondary'} className="text-[9px] h-4">
                       {report.status}
@@ -354,7 +362,7 @@ export function ExportCAM() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-medium text-muted-foreground">Defaulters (30th)</p>
+                      <p className="text-[10px] font-medium text-muted-foreground">20th Report (Without Recon)</p>
                       <div className="flex gap-1">
                         {report.defaulters_list_url ? (
                           <Button
@@ -381,7 +389,7 @@ export function ExportCAM() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <p className="text-[10px] font-medium text-muted-foreground">Recon (20th)</p>
+                      <p className="text-[10px] font-medium text-muted-foreground">30th Report (With Recon)</p>
                       <div className="flex gap-1">
                         {report.recon_list_url ? (
                           <Button
@@ -414,122 +422,124 @@ export function ExportCAM() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Detailed Collection Report
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={exportToExcel}>
-                <Download className="h-4 w-4 mr-2" />
-                Excel
-              </Button>
-              <Button variant="outline" size="sm" onClick={exportToPDF}>
-                <Download className="h-4 w-4 mr-2" />
-                PDF
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4 border-b pb-4">
-            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Fiscal Year" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map(year => (
-                  <SelectItem key={year} value={year.toString()}>FY {year}-{(year + 1).toString().slice(-2)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedQuarter.toString()} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Quarter" />
-              </SelectTrigger>
-              <SelectContent>
-                {FISCAL_QUARTERS.map(q => (
-                  <SelectItem key={q.value} value={q.value.toString()}>{q.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Total Assets</p>
-              <p className="text-2xl font-bold">{totalFlats}</p>
-            </div>
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-green-600 mb-1 font-medium">Paid</p>
-              <p className="text-2xl font-bold text-green-700">{totalPaid}</p>
-            </div>
-            <div className="p-4 bg-red-50 rounded-lg">
-              <p className="text-sm text-red-600 mb-1 font-medium">Pending</p>
-              <p className="text-2xl font-bold text-red-700">{totalPending}</p>
-            </div>
-            <div className="p-4 bg-primary/10 rounded-lg">
-              <p className="text-sm text-primary mb-1 font-medium">Overall Rate</p>
-              <p className="text-2xl font-bold text-primary">
-                {totalFlats > 0 ? ((totalPaid / totalFlats) * 100).toFixed(1) : 0}%
-              </p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-            </div>
-          ) : (
-            <div className="rounded-xl border shadow-sm">
-              <div className="max-h-[500px] overflow-auto">
-                <Table>
-                  <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                    <TableRow>
-                      <TableHead>Tower</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                      <TableHead className="text-right">Pending</TableHead>
-                      <TableHead className="text-right">Dues Clr</TableHead>
-                      <TableHead className="text-right">Advance</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {summary.map((row) => (
-                      <TableRow
-                        key={row.tower}
-                        className={mcUser?.tower_no === row.tower ? "bg-primary/5 ring-1 ring-primary/20" : ""}
-                      >
-                        <TableCell className="font-bold flex items-center gap-2">
-                          {row.tower}
-                          {mcUser?.tower_no === row.tower && <Badge variant="default" className="text-[9px] h-4 px-1">Your Tower</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">{row.totalFlats}</TableCell>
-                        <TableCell className="text-right text-green-600 font-medium">{row.paidFlats}</TableCell>
-                        <TableCell className="text-right text-red-600 font-medium">{row.pendingFlats}</TableCell>
-                        <TableCell className="text-right">{row.duesCleared}</TableCell>
-                        <TableCell className="text-right">{row.advance}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge
-                            variant={row.paidFlats / row.totalFlats >= 0.9 ? 'default' : 'secondary'}
-                            className={row.paidFlats / row.totalFlats >= 0.9 ? "bg-green-600" : ""}
-                          >
-                            {((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+      {!mcUser && (
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Detailed Collection Report
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={exportToExcel}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportToPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-4 border-b pb-4">
+              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Fiscal Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map(year => (
+                    <SelectItem key={year} value={year.toString()}>FY {year}-{(year + 1).toString().slice(-2)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedQuarter.toString()} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FISCAL_QUARTERS.map(q => (
+                    <SelectItem key={q.value} value={q.value.toString()}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Total Assets</p>
+                <p className="text-2xl font-bold">{totalFlats}</p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-600 mb-1 font-medium">Paid</p>
+                <p className="text-2xl font-bold text-green-700">{totalPaid}</p>
+              </div>
+              <div className="p-4 bg-red-50 rounded-lg">
+                <p className="text-sm text-red-600 mb-1 font-medium">Pending</p>
+                <p className="text-2xl font-bold text-red-700">{totalPending}</p>
+              </div>
+              <div className="p-4 bg-primary/10 rounded-lg">
+                <p className="text-sm text-primary mb-1 font-medium">Overall Rate</p>
+                <p className="text-2xl font-bold text-primary">
+                  {totalFlats > 0 ? ((totalPaid / totalFlats) * 100).toFixed(1) : 0}%
+                </p>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+              </div>
+            ) : (
+              <div className="rounded-xl border shadow-sm">
+                <div className="max-h-[500px] overflow-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                      <TableRow>
+                        <TableHead>Tower</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Pending</TableHead>
+                        <TableHead className="text-right">Dues Clr</TableHead>
+                        <TableHead className="text-right">Advance</TableHead>
+                        <TableHead className="text-right">Rate</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summary.map((row) => (
+                        <TableRow
+                          key={row.tower}
+                          className={mcUser?.tower_no === row.tower ? "bg-primary/5 ring-1 ring-primary/20" : ""}
+                        >
+                          <TableCell className="font-bold flex items-center gap-2">
+                            {row.tower}
+                            {mcUser?.tower_no === row.tower && <Badge variant="default" className="text-[9px] h-4 px-1">Your Tower</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right">{row.totalFlats}</TableCell>
+                          <TableCell className="text-right text-green-600 font-medium">{row.paidFlats}</TableCell>
+                          <TableCell className="text-right text-red-600 font-medium">{row.pendingFlats}</TableCell>
+                          <TableCell className="text-right">{row.duesCleared}</TableCell>
+                          <TableCell className="text-right">{row.advance}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant={row.paidFlats / row.totalFlats >= 0.9 ? 'default' : 'secondary'}
+                              className={row.paidFlats / row.totalFlats >= 0.9 ? "bg-green-600" : ""}
+                            >
+                              {((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
