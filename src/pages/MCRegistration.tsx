@@ -7,7 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Upload, User, Phone, Mail, Building, Home, Check } from 'lucide-react';
+import { Loader2, ArrowLeft, Upload, User, Phone, Mail, Building, Home, Check, Plus } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const INTEREST_GROUPS = [
   'Finance',
@@ -33,6 +41,8 @@ export default function MCRegistration() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showOtherDialog, setShowOtherDialog] = useState(false);
+  const [otherInterest, setOtherInterest] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -57,11 +67,36 @@ export default function MCRegistration() {
   };
 
   const toggleInterest = (interest: string) => {
+    if (interest === 'Others') {
+      if (selectedInterests.includes('Others')) {
+        setSelectedInterests(prev => prev.filter(i => i !== 'Others'));
+        setOtherInterest('');
+      } else {
+        setShowOtherDialog(true);
+      }
+      return;
+    }
+
     setSelectedInterests(prev =>
       prev.includes(interest)
         ? prev.filter(i => i !== interest)
         : [...prev, interest]
     );
+  };
+
+  const handleOtherSubmit = () => {
+    if (otherInterest.trim()) {
+      if (!selectedInterests.includes('Others')) {
+        setSelectedInterests(prev => [...prev, 'Others']);
+      }
+      setShowOtherDialog(false);
+    } else {
+      toast({
+        title: 'Input Required',
+        description: 'Please specify your interest.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,7 +157,7 @@ export default function MCRegistration() {
           contact_number: contactNumber,
           email,
           photo_url: publicUrl,
-          interest_groups: selectedInterests,
+          interest_groups: selectedInterests.map(i => i === 'Others' ? `Others: ${otherInterest}` : i),
           status: 'pending'
         });
 
@@ -323,6 +358,46 @@ export default function MCRegistration() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Others Interest Dialog */}
+      <Dialog open={showOtherDialog} onOpenChange={(open) => {
+        if (!open && !otherInterest) {
+          // If they close without entering, don't select Others
+        }
+        setShowOtherDialog(open);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Specify Your Interest</DialogTitle>
+            <DialogDescription>
+              Please let us know which other area you are interested in contributing to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="other-interest">Interest Detail *</Label>
+            <Input
+              id="other-interest"
+              placeholder="e.g., Landscape, Waste Management, etc."
+              value={otherInterest}
+              onChange={(e) => setOtherInterest(e.target.value)}
+              className="mt-2"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowOtherDialog(false);
+              setOtherInterest('');
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleOtherSubmit}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Interest
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

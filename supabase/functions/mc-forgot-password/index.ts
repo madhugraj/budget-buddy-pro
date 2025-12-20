@@ -27,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { email } = await req.json();
@@ -69,7 +69,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send password reset email
     const emailResponse = await resend.emails.send({
-      from: "Prestige Bella Vista <treasurer@prestige-bella-vista.com>",
+      from: "Prestige Bella Vista <onboarding@resend.dev>",
       to: [mcUser.email],
       subject: "Prestige Bella Vista - Password Reset",
       html: `

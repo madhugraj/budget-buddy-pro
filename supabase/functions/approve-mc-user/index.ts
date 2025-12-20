@@ -39,7 +39,7 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify the requester is a treasurer
@@ -50,7 +50,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+
     if (authError || !user) {
       throw new Error("Unauthorized");
     }
@@ -97,7 +97,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Send rejection email
       await resend.emails.send({
-        from: "Prestige Bella Vista <treasurer@prestige-bella-vista.com>",
+        from: "Prestige Bella Vista <onboarding@resend.dev>",
         to: [mcUser.email],
         subject: "Prestige Bella Vista - MC Registration Update",
         html: `
@@ -160,7 +160,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send approval email with credentials
     const emailResponse = await resend.emails.send({
-      from: "Prestige Bella Vista <treasurer@prestige-bella-vista.com>",
+      from: "Prestige Bella Vista <onboarding@resend.dev>",
       to: [mcUser.email],
       subject: "🎉 Welcome to Prestige Bella Vista Management Committee!",
       html: `
@@ -226,10 +226,10 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Approval email sent:", emailResponse);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: "MC user approved",
-        username: finalUsername 
+        username: finalUsername
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
