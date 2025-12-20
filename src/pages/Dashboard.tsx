@@ -1114,9 +1114,7 @@ export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Type</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Name</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Bank/Institution</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Account/Folio No.</th>
                         <th className="text-right py-2 px-3 font-medium text-muted-foreground">Current Value</th>
-                        <th className="text-right py-2 px-3 font-medium text-muted-foreground">Interest %</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Maturity</th>
                       </tr>
                     </thead>
@@ -1130,9 +1128,7 @@ export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
                           </td>
                           <td className="py-2 px-3 font-medium">{item.investment_name}</td>
                           <td className="py-2 px-3 text-muted-foreground">{item.bank_institution}</td>
-                          <td className="py-2 px-3 font-mono text-xs">{item.account_number || '-'}</td>
                           <td className="py-2 px-3 text-right font-semibold">{formatCurrency(item.current_value)}</td>
-                          <td className="py-2 px-3 text-right">{item.interest_rate ? `${item.interest_rate}%` : '-'}</td>
                           <td className="py-2 px-3 text-muted-foreground">
                             {item.maturity_date ? new Date(item.maturity_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                           </td>
@@ -1141,9 +1137,9 @@ export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
                     </tbody>
                     <tfoot>
                       <tr className="bg-muted/30">
-                        <td colSpan={4} className="py-2 px-3 font-semibold">Total</td>
+                        <td colSpan={3} className="py-2 px-3 font-semibold">Total</td>
                         <td className="py-2 px-3 text-right font-bold">{formatCurrency(savingsTotal)}</td>
-                        <td colSpan={2}></td>
+                        <td colSpan={1}></td>
                       </tr>
                     </tfoot>
                   </table>

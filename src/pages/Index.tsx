@@ -26,7 +26,15 @@ const Index = () => {
   }, [session, loading, navigate]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col relative text-foreground">
+      {/* Background Image Wrapper */}
+      <div
+        className="fixed inset-0 z-[-50] bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/background-image.jpg')" }}
+      />
+      {/* Overlay */}
+      <div className="fixed inset-0 z-[-40] bg-background/30 backdrop-blur-[1px]" />
+
       {/* Dashboard View - Public/Landing */}
       <div className="flex-1">
         <Dashboard />
