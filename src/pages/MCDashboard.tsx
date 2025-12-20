@@ -97,8 +97,8 @@ export default function MCDashboard() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-500">
-            {/* Reuse standard dashboard charts */}
-            <Dashboard />
+            {/* Reuse standard dashboard charts with tower filtration */}
+            <Dashboard towerFilter={mcUser.tower_no} isMC={true} />
           </TabsContent>
 
           <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-500">

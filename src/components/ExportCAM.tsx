@@ -96,22 +96,19 @@ export function ExportCAM() {
   const fetchCAMData = async () => {
     setLoading(true);
     try {
-      const calendarYear = selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
-      const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
-      const months = quarterConfig?.months || [];
-
+      // Fetch all records for the fiscal year to have a complete picture
       const { data, error } = await supabase
         .from('cam_tracking')
         .select('*')
-        .eq('year', calendarYear)
-        .eq('status', 'approved');
+        .eq('status', 'approved')
+        .in('year', [selectedYear, selectedYear + 1]);
 
       if (error) throw error;
 
-      const filteredData = (data || []).filter(d => d.month && months.includes(d.month)) as unknown as CAMRecord[];
-      setCamData(filteredData);
+      setCamData((data || []) as unknown as CAMRecord[]);
     } catch (error: any) {
-      toast.error('Failed to fetch CAM data: ' + error.message);
+      console.error('Error fetching CAM data:', error);
+      toast.error('Failed to load CAM data');
     } finally {
       setLoading(false);
     }
@@ -220,10 +217,21 @@ export function ExportCAM() {
 
   const getQuarterSummary = () => {
     const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
-    const months = quarterConfig?.months || [];
+    const monthsInQuarter = quarterConfig?.months || [];
 
-    const summary: Record<string, { tower: string; totalFlats: number; paidFlats: number; pendingFlats: number; duesCleared: number; advance: number; camRecon: number; month?: number }> = {};
+    const summary: Record<string, {
+      tower: string;
+      totalFlats: number;
+      paidFlats: number;
+      pendingFlats: number;
+      duesCleared: number;
+      advance: number;
+      camRecon: number;
+      month?: number;
+      isFromSelectedPeriod: boolean;
+    }> = {};
 
+    // Initialize with defaults
     TOWERS.forEach(tower => {
       summary[tower] = {
         tower,
@@ -232,28 +240,47 @@ export function ExportCAM() {
         pendingFlats: TOWER_TOTAL_FLATS[tower],
         duesCleared: 0,
         advance: 0,
-        camRecon: 0
+        camRecon: 0,
+        isFromSelectedPeriod: false
       };
     });
 
+    // We want the latest approved month recorded for each tower.
+    // Preference 1: Latest month WITHIN the selected quarter
+    // Preference 2: If none, latest month overall in the fiscal year
     camData.forEach(record => {
-      if (record.month && months.includes(record.month)) {
-        // We want the latest approved month recorded for each tower in this quarter
-        const existing = summary[record.tower];
-        const isLatestMonth = !existing || (record.month > (existing as any).month || 0);
+      if (!record.month) return;
 
-        if (isLatestMonth) {
-          summary[record.tower] = {
-            tower: record.tower,
-            totalFlats: record.total_flats,
-            paidFlats: record.paid_flats,
-            pendingFlats: record.pending_flats,
-            duesCleared: record.dues_cleared_from_previous,
-            advance: record.advance_payments,
-            camRecon: (record as any).cam_recon_flats || 0,
-            month: record.month // Temporarily track month
-          } as any;
+      const existing = summary[record.tower];
+      const isInQuarter = monthsInQuarter.includes(record.month);
+
+      // Determine if we should update this tower's stats
+      let shouldUpdate = false;
+
+      if (isInQuarter) {
+        // If this record is in the quarter, and existing is NOT in quarter, OR this is a later month in quarter
+        if (!existing.isFromSelectedPeriod || record.month > (existing.month || 0)) {
+          shouldUpdate = true;
         }
+      } else if (!existing.isFromSelectedPeriod) {
+        // If record is NOT in quarter, only update if existing is also not and this is later
+        if (!existing.month || record.month > existing.month) {
+          shouldUpdate = true;
+        }
+      }
+
+      if (shouldUpdate) {
+        summary[record.tower] = {
+          tower: record.tower,
+          totalFlats: record.total_flats,
+          paidFlats: record.paid_flats,
+          pendingFlats: record.pending_flats,
+          duesCleared: record.dues_cleared_from_previous,
+          advance: record.advance_payments,
+          cam_recon_flats: (record as any).cam_recon_flats || 0,
+          month: record.month,
+          isFromSelectedPeriod: isInQuarter
+        } as any;
       }
     });
 
@@ -375,8 +402,18 @@ export function ExportCAM() {
               <Building2 className="h-5 w-5" />
               Tower {mcUser.tower_no} Summary - FY {selectedYear}-{selectedYear + 1} Q{selectedQuarter}
             </CardTitle>
-            <CardDescription>
-              Latest approved status (up to {towerStats.month ? MONTH_NAMES[towerStats.month] : 'none'}) for the selected period.
+            <CardDescription className="flex items-center gap-2">
+              {towerStats.isFromSelectedPeriod ? (
+                <span className="flex items-center gap-1 text-green-600 font-medium">
+                  Showing data for Q{selectedQuarter} {selectedYear}-{selectedYear + 1}
+                </span>
+              ) : towerStats.month ? (
+                <span className="flex items-center gap-1 text-amber-600 font-medium italic">
+                  No data for selected period. Showing latest available: {MONTH_NAMES[towerStats.month]}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">No approved data available yet.</span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -105,7 +105,12 @@ const CAM_HALFYEARS = [
   { value: 2, label: 'H2 (Oct-Mar)', months: [10, 11, 12, 1, 2, 3] }
 ];
 
-export default function Dashboard() {
+interface DashboardProps {
+  towerFilter?: string;
+  isMC?: boolean;
+}
+
+export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [itemData, setItemData] = useState<ItemData[]>([]);
@@ -138,28 +143,23 @@ export default function Dashboard() {
 
   const loadPettyCashData = async () => {
     try {
-      // Get current fiscal year dates (Apr 2024 - Mar 2025 for FY 2024-25)
       const now = new Date();
-      const currentMonth = now.getMonth() + 1; // 1-12
+      const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
 
-      // If current month is Jan-Mar, fiscal year started last year
-      // If current month is Apr-Dec, fiscal year started this year
       const fiscalYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
-      const fiscalYearEnd = fiscalYearStart + 1;
-
       const startDate = `${fiscalYearStart}-04-01`;
-      const endDate = new Date().toISOString().split('T')[0]; // Current date
+      const endDate = new Date().toISOString().split('T')[0];
 
-      console.log('Loading petty cash for fiscal year:', startDate, 'to', endDate);
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('petty_cash')
         .select('amount, date, item_name')
         .eq('status', 'approved')
         .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date');
+        .lte('date', endDate);
+
+      // No tower filter for petty cash as it is generally complex-wide
+      const { data, error } = await query.order('date');
 
       if (error) throw error;
 
@@ -226,17 +226,22 @@ export default function Dashboard() {
 
   const loadCAMData = async () => {
     try {
-      // Get current fiscal year - if month >= 4 (April), use current year, else use previous year
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const fiscalYearStart = currentMonth >= 4 ? now.getFullYear() : now.getFullYear() - 1;
 
-      const { data, error } = await supabase
+      // Fetch from both calendar years covering the fiscal year
+      let query = supabase
         .from('cam_tracking')
         .select('tower, month, paid_flats, pending_flats, total_flats, year, status')
         .eq('status', 'approved')
-        .eq('year', fiscalYearStart); // Filter by fiscal year
+        .in('year', [fiscalYearStart, fiscalYearStart + 1]);
 
+      if (towerFilter) {
+        query = query.eq('tower', towerFilter);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
 
       console.log('CAM Data loaded:', data);
@@ -998,78 +1003,85 @@ export default function Dashboard() {
         <TabsContent value="cam" className="space-y-6 mt-6">
           <div className="w-full overflow-hidden">
             <Card className="border-none shadow-lg hover:shadow-xl transition-all bg-gradient-to-br from-card via-card to-purple-50">
+              <CardHeader className="pb-0 pt-6 px-6">
+                <CardTitle className="text-lg font-medium">
+                  {towerFilter ? `Tower ${towerFilter} Collection Trend` : 'Complex-wide CAM Collection Trend'}
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-6">
                 <MonthlyCAMChart data={monthlyCAMData} />
               </CardContent>
             </Card>
           </div>
 
-          <div className="w-full overflow-hidden">
-            {/* CAM Filtering Controls */}
-            <div className="flex flex-wrap items-center gap-4 mb-4 bg-background/50 p-2 rounded-lg border">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Filter by:</span>
+          {!towerFilter && (
+            <div className="w-full overflow-hidden">
+              {/* CAM Filtering Controls */}
+              <div className="flex flex-wrap items-center gap-4 mb-4 bg-background/50 p-2 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filter by:</span>
+                </div>
+
+                <Select value={camFilterType} onValueChange={(val) => {
+                  setCamFilterType(val);
+                  setCamFilterValue(val === 'latest' || val === 'year' ? 'all' : '');
+                }}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue placeholder="Filter Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="latest">Latest Month</SelectItem>
+                    <SelectItem value="month">Specific Month</SelectItem>
+                    <SelectItem value="quarter">Quarterly</SelectItem>
+                    <SelectItem value="half_year">Half Yearly</SelectItem>
+                    <SelectItem value="year">Full Year</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {camFilterType === 'month' && (
+                  <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Select Month" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAM_MONTHS.map(m => (
+                        <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {camFilterType === 'quarter' && (
+                  <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Select Quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAM_QUARTERS.map(q => (
+                        <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {camFilterType === 'half_year' && (
+                  <Select value={camFilterValue} onValueChange={setCamFilterValue}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Select Half Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CAM_HALFYEARS.map(h => (
+                        <SelectItem key={h.value} value={String(h.value)}>{h.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
-              <Select value={camFilterType} onValueChange={(val) => {
-                setCamFilterType(val);
-                setCamFilterValue(val === 'latest' || val === 'year' ? 'all' : '');
-              }}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="Filter Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="latest">Latest Month</SelectItem>
-                  <SelectItem value="month">Specific Month</SelectItem>
-                  <SelectItem value="quarter">Quarterly</SelectItem>
-                  <SelectItem value="half_year">Half Yearly</SelectItem>
-                  <SelectItem value="year">Full Year</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {camFilterType === 'month' && (
-                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                    <SelectValue placeholder="Select Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CAM_MONTHS.map(m => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {camFilterType === 'quarter' && (
-                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                    <SelectValue placeholder="Select Quarter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CAM_QUARTERS.map(q => (
-                      <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {camFilterType === 'half_year' && (
-                <Select value={camFilterValue} onValueChange={setCamFilterValue}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs">
-                    <SelectValue placeholder="Select Half Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CAM_HALFYEARS.map(h => (
-                      <SelectItem key={h.value} value={String(h.value)}>{h.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              <TowerCAMChart data={towerCAMData} />
             </div>
-
-            <TowerCAMChart data={towerCAMData} />
-          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="petty-cash" className="space-y-6 mt-6">
