@@ -51,6 +51,7 @@ interface CAMRecord {
   total_flats: number;
   dues_cleared_from_previous: number;
   advance_payments: number;
+  cam_recon_flats: number;
   status: string;
   notes: string | null;
 }
@@ -100,7 +101,7 @@ export function ExportCAM() {
     const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
     const months = quarterConfig?.months || [];
 
-    const summary: Record<string, { tower: string; totalFlats: number; paidFlats: number; pendingFlats: number; duesCleared: number; advance: number }> = {};
+    const summary: Record<string, { tower: string; totalFlats: number; paidFlats: number; pendingFlats: number; duesCleared: number; advance: number; camRecon: number }> = {};
 
     TOWERS.forEach(tower => {
       summary[tower] = {
@@ -109,7 +110,8 @@ export function ExportCAM() {
         paidFlats: 0,
         pendingFlats: TOWER_TOTAL_FLATS[tower],
         duesCleared: 0,
-        advance: 0
+        advance: 0,
+        camRecon: 0
       };
     });
 
@@ -124,7 +126,8 @@ export function ExportCAM() {
             paidFlats: record.paid_flats,
             pendingFlats: record.pending_flats,
             duesCleared: record.dues_cleared_from_previous,
-            advance: record.advance_payments
+            advance: record.advance_payments,
+            camRecon: (record as any).cam_recon_flats || 0
           };
         }
       }
@@ -142,6 +145,7 @@ export function ExportCAM() {
       'Pending Flats': row.pendingFlats,
       'Dues Cleared': row.duesCleared,
       'Advance Payments': row.advance,
+      'CAM Recon': row.camRecon,
       'Collection Rate (%)': ((row.paidFlats / row.totalFlats) * 100).toFixed(1)
     }));
 
@@ -155,10 +159,10 @@ export function ExportCAM() {
   const exportToPDF = () => {
     const summary = getQuarterSummary();
     const doc = new jsPDF();
-    
+
     doc.setFontSize(16);
     doc.text(`CAM Collection Report - FY${selectedYear} Q${selectedQuarter}`, 14, 20);
-    
+
     const tableData = summary.map(row => [
       row.tower,
       row.totalFlats.toString(),
@@ -166,11 +170,12 @@ export function ExportCAM() {
       row.pendingFlats.toString(),
       row.duesCleared.toString(),
       row.advance.toString(),
+      row.camRecon.toString(),
       `${((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%`
     ]);
 
     autoTable(doc, {
-      head: [['Tower', 'Total', 'Paid', 'Pending', 'Dues Cleared', 'Advance', 'Rate']],
+      head: [['Tower', 'Total', 'Paid', 'Pending', 'Dues Cleared', 'Advance', 'CAM Recon', 'Rate']],
       body: tableData,
       startY: 30,
       styles: { fontSize: 8 },
@@ -285,6 +290,7 @@ export function ExportCAM() {
                     <TableHead className="text-right">Pending</TableHead>
                     <TableHead className="text-right">Dues Cleared</TableHead>
                     <TableHead className="text-right">Advance</TableHead>
+                    <TableHead className="text-right">CAM Recon</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -297,6 +303,7 @@ export function ExportCAM() {
                       <TableCell className="text-right text-red-600">{row.pendingFlats}</TableCell>
                       <TableCell className="text-right">{row.duesCleared}</TableCell>
                       <TableCell className="text-right">{row.advance}</TableCell>
+                      <TableCell className="text-right">{row.camRecon}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={row.paidFlats / row.totalFlats >= 0.9 ? 'default' : 'secondary'}>
                           {((row.paidFlats / row.totalFlats) * 100).toFixed(1)}%
