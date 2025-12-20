@@ -200,7 +200,7 @@ export function ExportCAM() {
     const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
     const months = quarterConfig?.months || [];
 
-    const summary: Record<string, { tower: string; totalFlats: number; paidFlats: number; pendingFlats: number; duesCleared: number; advance: number; camRecon: number }> = {};
+    const summary: Record<string, { tower: string; totalFlats: number; paidFlats: number; pendingFlats: number; duesCleared: number; advance: number; camRecon: number; month?: number }> = {};
 
     TOWERS.forEach(tower => {
       summary[tower] = {
@@ -216,8 +216,11 @@ export function ExportCAM() {
 
     camData.forEach(record => {
       if (record.month && months.includes(record.month)) {
-        const lastMonthInQuarter = Math.max(...months);
-        if (record.month === lastMonthInQuarter) {
+        // We want the latest approved month recorded for each tower in this quarter
+        const existing = summary[record.tower];
+        const isLatestMonth = !existing || (record.month > (existing as any).month || 0);
+
+        if (isLatestMonth) {
           summary[record.tower] = {
             tower: record.tower,
             totalFlats: record.total_flats,
@@ -225,8 +228,9 @@ export function ExportCAM() {
             pendingFlats: record.pending_flats,
             duesCleared: record.dues_cleared_from_previous,
             advance: record.advance_payments,
-            camRecon: (record as any).cam_recon_flats || 0
-          };
+            camRecon: (record as any).cam_recon_flats || 0,
+            month: record.month // Temporarily track month
+          } as any;
         }
       }
     });
@@ -306,8 +310,11 @@ export function ExportCAM() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-primary">
               <Building2 className="h-5 w-5" />
-              Tower {mcUser.tower_no} Summary
+              Tower {mcUser.tower_no} Summary - FY {selectedYear}-{selectedYear + 1} Q{selectedQuarter}
             </CardTitle>
+            <CardDescription>
+              Latest approved status (up to {towerStats.month ? MONTH_NAMES[towerStats.month] : 'none'}) for the selected period.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

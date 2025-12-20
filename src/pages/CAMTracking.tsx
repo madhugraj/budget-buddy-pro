@@ -1188,9 +1188,21 @@ export default function CAMTracking() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex flex-wrap items-center gap-4 mb-4">
+                  <Select value={selectedTower} onValueChange={setSelectedTower}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select Tower" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TOWERS.map(tower => (
+                        <SelectItem key={tower} value={tower}>
+                          Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1200,7 +1212,7 @@ export default function CAMTracking() {
                     </SelectContent>
                   </Select>
                   <div className="text-sm text-muted-foreground">
-                    <p>Lead users upload Defaulters List on 30th and Recon List on 20th.</p>
+                    <p>Lead users upload Defaulters List on 30th and Recon List on 20th for each tower.</p>
                   </div>
                 </div>
 
