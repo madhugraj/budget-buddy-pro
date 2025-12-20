@@ -58,8 +58,25 @@ interface CAMRecord {
 
 export function ExportCAM() {
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedQuarter, setSelectedQuarter] = useState(1);
+  const getCurrentFiscal = () => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    // Fiscal year starts in April
+    const fYear = month <= 3 ? year - 1 : year;
+    let quarter = 1;
+    if (month >= 4 && month <= 6) quarter = 1;
+    else if (month >= 7 && month <= 9) quarter = 2;
+    else if (month >= 10 && month <= 12) quarter = 3;
+    else quarter = 4;
+
+    return { year: fYear, quarter };
+  };
+
+  const initialFiscal = getCurrentFiscal();
+  const [selectedYear, setSelectedYear] = useState(initialFiscal.year);
+  const [selectedQuarter, setSelectedQuarter] = useState(initialFiscal.quarter);
   const [camData, setCamData] = useState<CAMRecord[]>([]);
   const [mcUser, setMcUser] = useState<any>(null);
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
@@ -309,6 +326,47 @@ export function ExportCAM() {
 
   return (
     <div className="space-y-6">
+      {/* Global Filters */}
+      <Card className="bg-muted/30 border-none">
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Fiscal Year</label>
+              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="Fiscal Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map(year => (
+                    <SelectItem key={year} value={year.toString()}>FY {year}-{(year + 1).toString().slice(-2)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Quarter</label>
+              <Select value={selectedQuarter.toString()} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
+                <SelectTrigger className="w-[160px] h-9">
+                  <SelectValue placeholder="Quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FISCAL_QUARTERS.map(q => (
+                    <SelectItem key={q.value} value={q.value.toString()}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {mcUser && (
+              <Badge variant="outline" className="ml-auto bg-primary/5 text-primary border-primary/20 h-9 px-3">
+                <Building2 className="mr-1.5 h-3.5 w-3.5" />
+                Tower {mcUser.tower_no}
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       {/* MC Member's Tower Overview */}
       {mcUser && towerStats && (
         <Card className="bg-primary/5 border-primary/20 shadow-md">
@@ -455,30 +513,6 @@ export function ExportCAM() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-center gap-4 border-b pb-4">
-              <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Fiscal Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map(year => (
-                    <SelectItem key={year} value={year.toString()}>FY {year}-{(year + 1).toString().slice(-2)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedQuarter.toString()} onValueChange={(v) => setSelectedQuarter(parseInt(v))}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Quarter" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FISCAL_QUARTERS.map(q => (
-                    <SelectItem key={q.value} value={q.value.toString()}>{q.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Total Assets</p>
