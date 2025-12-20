@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, XCircle, User, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Download, Loader2, CheckCircle, XCircle, User, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import {
   Dialog,
   DialogContent,
@@ -176,6 +177,35 @@ export default function MCApprovals() {
     }
   };
 
+  const downloadApprovedUsers = () => {
+    if (approvedMC.length === 0) {
+      toast({
+        title: 'No data to download',
+        description: 'There are no approved MC members at the moment.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const exportData = approvedMC.map(user => ({
+      'Name': user.name,
+      'Tower No': user.tower_no,
+      'Unit No': user.unit_no,
+      'Login ID': user.login_username || 'Not set',
+      'Temp Password': user.temp_password || '---'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Approved MC Users');
+    XLSX.writeFile(wb, `MC_Approved_Users_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    toast({
+      title: 'Download Started',
+      description: 'The approved MC users list is being downloaded.',
+    });
+  };
+
   if (loading) {
     return (
       <Card>
@@ -271,8 +301,16 @@ export default function MCApprovals() {
           <TabsContent value="approved" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Approved Members</CardTitle>
-                <CardDescription>View credentials and manage member access</CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Approved Members</CardTitle>
+                    <CardDescription>View credentials and manage member access</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={downloadApprovedUsers}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download List
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {approvedMC.length === 0 ? (

@@ -132,17 +132,18 @@ const handler = async (req: Request): Promise<Response> => {
     const tempPassword = generateTempPassword();
     const username = generateUsername(mcUser.name, mcUser.unit_no);
 
-    // Check if username already exists
+    // Check if username already exists in approved users
     const { data: existingUser } = await supabase
       .from("mc_users")
       .select("id")
       .eq("login_username", username)
-      .single();
+      .eq("status", "approved")
+      .maybeSingle();
 
     let finalUsername = username;
     if (existingUser) {
-      // Append a random suffix if username exists
-      finalUsername = `${username.replace('@mc-2527', '')}-${Date.now().toString(36)}@mc-2527`;
+      // Only append suffix if there's a collision with an ALREADY APPROVED user
+      finalUsername = `${username.replace('@mc-2527', '')}-${Math.floor(Math.random() * 1000)}@mc-2527`;
     }
 
     const { error: updateError } = await supabase
