@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,13 @@ export default function MCAuth() {
   const [mode, setMode] = useState<'login' | 'change-password' | 'forgot'>('login');
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const mcUser = localStorage.getItem('mc_user');
+    if (mcUser) {
+      navigate('/mc-dashboard');
+    }
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
