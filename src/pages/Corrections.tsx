@@ -110,6 +110,17 @@ interface SavingsMaster {
 }
 
 export default function Corrections() {
+  // Calculate dynamic defaults
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const fiscalStartYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+  const fiscalEndYear = fiscalStartYear + 1;
+  const defaultFiscalYearStr = `FY${fiscalStartYear.toString().slice(-2)}-${fiscalEndYear.toString().slice(-2)}`;
+  const defaultDateFrom = `${fiscalStartYear}-04-01`;
+  // Default dateTo to today
+  const defaultDateTo = new Date().toISOString().split('T')[0];
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -137,8 +148,8 @@ export default function Corrections() {
   const [historicalSavings, setHistoricalSavings] = useState<SavingsMaster[]>([]);
   const [historicalLoading, setHistoricalLoading] = useState(false);
   const [selectedHistorical, setSelectedHistorical] = useState<Set<string>>(new Set());
-  const [dateFrom, setDateFrom] = useState<string>('2025-04-01');
-  const [dateTo, setDateTo] = useState<string>('2025-10-31');
+  const [dateFrom, setDateFrom] = useState<string>(defaultDateFrom);
+  const [dateTo, setDateTo] = useState<string>(defaultDateTo);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [bulkReason, setBulkReason] = useState('');
@@ -156,7 +167,7 @@ export default function Corrections() {
   const [editIncomeNotes, setEditIncomeNotes] = useState<string>('');
   const [editIncomeCategory, setEditIncomeCategory] = useState<string>('');
   const [editIncomeMonth, setEditIncomeMonth] = useState<number>(4);
-  const [editIncomeFiscalYear, setEditIncomeFiscalYear] = useState<string>('FY25-26');
+  const [editIncomeFiscalYear, setEditIncomeFiscalYear] = useState<string>(defaultFiscalYearStr);
   const [editIncomeDate, setEditIncomeDate] = useState<string>('');
   const [incomeCategories, setIncomeCategories] = useState<any[]>([]);
 
@@ -252,7 +263,7 @@ export default function Corrections() {
       const { data, error } = await supabase
         .from('budget_master')
         .select('*')
-        .eq('fiscal_year', 'FY25-26')
+        .eq('fiscal_year', defaultFiscalYearStr)
         .order('category, item_name');
 
       if (error) throw error;

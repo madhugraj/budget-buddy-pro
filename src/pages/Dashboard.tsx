@@ -141,6 +141,13 @@ export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
     user
   } = useAuth();
 
+  // Calculate current fiscal year string for display
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const fiscalStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+  const currentFiscalYearStr = `${fiscalStart}-${(fiscalStart + 1).toString().slice(-2)}`;
+
   const loadPettyCashData = async () => {
     try {
       const now = new Date();
@@ -799,7 +806,7 @@ export default function Dashboard({ towerFilter, isMC }: DashboardProps = {}) {
           </div>}
           <div className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 shadow-xl">
             <span className="text-white/80">Fiscal Year</span>
-            <span className="font-bold text-white">2025-26</span>
+            <span className="font-bold text-white">{currentFiscalYearStr}</span>
           </div>
         </div>
       </div>

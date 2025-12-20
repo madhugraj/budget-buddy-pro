@@ -48,6 +48,12 @@ export default function MCDashboard() {
     return null;
   }
 
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const fiscalStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+  const currentFiscalYearStr = `${fiscalStart}-${(fiscalStart + 1).toString().slice(-2)}`;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -68,7 +74,7 @@ export default function MCDashboard() {
           <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full border border-border text-xs font-semibold">
               <span className="text-muted-foreground">Fiscal Year</span>
-              <span className="text-foreground">2025-26</span>
+              <span className="text-foreground">{currentFiscalYearStr}</span>
             </div>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
               <LogOut className="h-4 w-4 mr-2" />

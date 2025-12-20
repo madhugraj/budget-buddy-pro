@@ -82,7 +82,9 @@ export function ExportCAM() {
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const years = Array.from({ length: 2 }, (_, i) => 2024 + i);
+  // Dynamic year generation: Start from 2024 up to current year + 1
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 2023 + 2 }, (_, i) => 2024 + i);
 
   useEffect(() => {
     const stored = localStorage.getItem('mc_user');
