@@ -14,40 +14,78 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import * as XLSX from 'xlsx';
-
-const TOWERS = [
-  '1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8',
-  '9A', '9B', '9C', '10', '11', '12', '13', '14', '15A', '15B',
-  '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'
-];
+const TOWERS = ['1A', '1B', '2A', '2B', '3A', '3B', '4A', '4B', '5', '6', '7', '8', '9A', '9B', '9C', '10', '11', '12', '13', '14', '15A', '15B', '16A', '16B', '17A', '17B', '18A', '18B', '18C', '19', '20A', '20B', '20C'];
 
 // Tower-specific total flats: 67 per tower, except 12, 13, 14 which have 201 each
 const TOWER_TOTAL_FLATS: Record<string, number> = {
-  '1A': 67, '1B': 67, '2A': 67, '2B': 67, '3A': 67, '3B': 67,
-  '4A': 67, '4B': 67, '5': 67, '6': 67, '7': 67, '8': 67,
-  '9A': 67, '9B': 67, '9C': 67, '10': 67, '11': 67,
-  '12': 201, '13': 201, '14': 201,
-  '15A': 67, '15B': 67,
-  '16A': 67, '16B': 67, '17A': 67, '17B': 67,
-  '18A': 67, '18B': 67, '18C': 67, '19': 67,
-  '20A': 67, '20B': 67, '20C': 67
+  '1A': 67,
+  '1B': 67,
+  '2A': 67,
+  '2B': 67,
+  '3A': 67,
+  '3B': 67,
+  '4A': 67,
+  '4B': 67,
+  '5': 67,
+  '6': 67,
+  '7': 67,
+  '8': 67,
+  '9A': 67,
+  '9B': 67,
+  '9C': 67,
+  '10': 67,
+  '11': 67,
+  '12': 201,
+  '13': 201,
+  '14': 201,
+  '15A': 67,
+  '15B': 67,
+  '16A': 67,
+  '16B': 67,
+  '17A': 67,
+  '17B': 67,
+  '18A': 67,
+  '18B': 67,
+  '18C': 67,
+  '19': 67,
+  '20A': 67,
+  '20B': 67,
+  '20C': 67
 };
-
 const TOTAL_FLATS_IN_COMPLEX = 2613;
 
 // Fiscal Year Quarters (Q1 starts April)
-const FISCAL_QUARTERS = [
-  { value: 1, label: 'Q1 (Apr-Jun)', months: [4, 5, 6] },
-  { value: 2, label: 'Q2 (Jul-Sep)', months: [7, 8, 9] },
-  { value: 3, label: 'Q3 (Oct-Dec)', months: [10, 11, 12] },
-  { value: 4, label: 'Q4 (Jan-Mar)', months: [1, 2, 3] }
-];
-
+const FISCAL_QUARTERS = [{
+  value: 1,
+  label: 'Q1 (Apr-Jun)',
+  months: [4, 5, 6]
+}, {
+  value: 2,
+  label: 'Q2 (Jul-Sep)',
+  months: [7, 8, 9]
+}, {
+  value: 3,
+  label: 'Q3 (Oct-Dec)',
+  months: [10, 11, 12]
+}, {
+  value: 4,
+  label: 'Q4 (Jan-Mar)',
+  months: [1, 2, 3]
+}];
 const MONTH_NAMES: Record<number, string> = {
-  1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
-  7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'
+  1: 'Jan',
+  2: 'Feb',
+  3: 'Mar',
+  4: 'Apr',
+  5: 'May',
+  6: 'Jun',
+  7: 'Jul',
+  8: 'Aug',
+  9: 'Sep',
+  10: 'Oct',
+  11: 'Nov',
+  12: 'Dec'
 };
-
 interface CAMData {
   id?: string;
   tower: string;
@@ -65,7 +103,6 @@ interface CAMData {
   status?: string;
   document_url?: string | null;
 }
-
 interface CAMDataFromDB {
   id: string;
   tower: string;
@@ -85,7 +122,6 @@ interface CAMDataFromDB {
   updated_at: string;
   document_url?: string | null;
 }
-
 interface MonthlyReport {
   id: string;
   year: number;
@@ -95,9 +131,10 @@ interface MonthlyReport {
   uploaded_at: string;
   uploaded_by: string;
 }
-
 export default function CAMTracking() {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const [searchParams] = useSearchParams();
 
   // Parse URL parameters for pre-selection from discrepancy report
@@ -105,7 +142,6 @@ export default function CAMTracking() {
   const urlQuarter = searchParams.get('quarter');
   const urlYear = searchParams.get('year');
   const urlTab = searchParams.get('tab');
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(urlTab || 'tower-entry');
@@ -137,14 +173,13 @@ export default function CAMTracking() {
   const [monthlyReports, setMonthlyReports] = useState<MonthlyReport[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
   const isMC = !!localStorage.getItem('mc_user');
-
-  const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
-
+  const years = Array.from({
+    length: new Date().getFullYear() - 2023
+  }, (_, i) => 2024 + i);
   useEffect(() => {
     fetchUserRole();
     fetchDiscrepancyCount();
   }, [user]);
-
   useEffect(() => {
     fetchCAMData();
     fetchMonthlyReports();
@@ -152,27 +187,22 @@ export default function CAMTracking() {
       loadDraftRecords();
     }
   }, [selectedYear, selectedQuarter, userRole]);
-
   const fetchDiscrepancyCount = async () => {
     try {
       const currentYear = new Date().getFullYear();
-      const { data, error } = await supabase
-        .from('cam_tracking')
-        .select('*')
-        .or(`and(year.eq.${currentYear},month.gte.4),and(year.eq.${currentYear + 1},month.lte.3)`);
-
+      const {
+        data,
+        error
+      } = await supabase.from('cam_tracking').select('*').or(`and(year.eq.${currentYear},month.gte.4),and(year.eq.${currentYear + 1},month.lte.3)`);
       if (error) throw error;
       const records = data as CAMDataFromDB[];
       let count = 0;
-
       TOWERS.forEach(tower => {
         FISCAL_QUARTERS.forEach(quarter => {
           const qMonths = quarter.months;
           const towerQData = records.filter(r => r.tower === tower && qMonths.includes(r.month || 0));
           towerQData.sort((a, b) => qMonths.indexOf(a.month || 0) - qMonths.indexOf(b.month || 0));
-
           if (towerQData.length < 2) return;
-
           let previousPending = -1;
           towerQData.forEach(record => {
             if (previousPending !== -1 && record.pending_flats > previousPending) {
@@ -182,50 +212,49 @@ export default function CAMTracking() {
           });
         });
       });
-
       setDiscrepancyCount(count);
     } catch (error) {
       console.error('Error fetching discrepancy count:', error);
     }
   };
-
   const fetchUserRole = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single();
+    const {
+      data
+    } = await supabase.from('user_roles').select('role').eq('user_id', user.id).single();
     setUserRole(data?.role || null);
   };
-
   const getCalendarYearAndMonths = () => {
     const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
-    if (!quarterConfig) return { year: selectedYear, months: [] };
-
+    if (!quarterConfig) return {
+      year: selectedYear,
+      months: []
+    };
     const months = quarterConfig.months;
     // If Q4 (Jan-Mar), it falls in the next calendar year
     const calendarYear = selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
-
-    return { calendarYear, months };
+    return {
+      calendarYear,
+      months
+    };
   };
-
   const fetchCAMData = async () => {
     setLoading(true);
     try {
-      const { calendarYear, months } = getCalendarYearAndMonths();
+      const {
+        calendarYear,
+        months
+      } = getCalendarYearAndMonths();
 
       // Fetch data for the specific months in the calendar year
-      const { data, error } = await supabase
-        .from('cam_tracking')
-        .select('*')
-        .eq('year', calendarYear);
-
+      const {
+        data,
+        error
+      } = await supabase.from('cam_tracking').select('*').eq('year', calendarYear);
       if (error) throw error;
 
       // Cast data to our expected type (types.ts may not have month/is_locked yet)
       const typedData = (data || []) as unknown as CAMDataFromDB[];
-
       const dataMap: Record<string, Record<number, CAMData>> = {};
 
       // Initialize structure
@@ -274,7 +303,6 @@ export default function CAMTracking() {
         }
       });
       setSupportingDocs(docsMap);
-
       setCamData(dataMap);
       setValidationErrors({});
     } catch (error: any) {
@@ -283,24 +311,18 @@ export default function CAMTracking() {
       setLoading(false);
     }
   };
-
   const loadDraftRecords = async () => {
     if (!user) return;
     setLoadingDrafts(true);
     try {
-      const { calendarYear } = getCalendarYearAndMonths();
-
-      const { data, error } = await supabase
-        .from('cam_tracking')
-        .select('*')
-        .eq('year', calendarYear)
-        .eq('status', 'draft')
-        .eq('uploaded_by', user.id)
-        .order('tower')
-        .order('month');
-
+      const {
+        calendarYear
+      } = getCalendarYearAndMonths();
+      const {
+        data,
+        error
+      } = await supabase.from('cam_tracking').select('*').eq('year', calendarYear).eq('status', 'draft').eq('uploaded_by', user.id).order('tower').order('month');
       if (error) throw error;
-
       setDraftRecords((data || []) as CAMDataFromDB[]);
     } catch (error: any) {
       toast.error('Failed to load draft records: ' + error.message);
@@ -308,28 +330,21 @@ export default function CAMTracking() {
       setLoadingDrafts(false);
     }
   };
-
   const handleBulkSubmit = async () => {
     if (!user || selectedDrafts.size === 0) return;
-
     const confirmed = confirm(`Submit ${selectedDrafts.size} draft record(s) for approval?`);
     if (!confirmed) return;
-
     setSaving(true);
     try {
       const idsToSubmit = Array.from(selectedDrafts);
-
-      const { error } = await supabase
-        .from('cam_tracking')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          uploaded_by: user.id
-        } as any)
-        .in('id', idsToSubmit);
-
+      const {
+        error
+      } = await supabase.from('cam_tracking').update({
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        uploaded_by: user.id
+      } as any).in('id', idsToSubmit);
       if (error) throw error;
-
       toast.success(`${idsToSubmit.length} record(s) submitted for approval`);
       setSelectedDrafts(new Set());
       loadDraftRecords();
@@ -340,44 +355,30 @@ export default function CAMTracking() {
       setSaving(false);
     }
   };
-
   const validateTowerData = (tower: string, month: number, data: CAMData): string | null => {
     const maxFlats = TOWER_TOTAL_FLATS[tower];
-
     if (data.paid_flats < 0 || data.pending_flats < 0) {
       return 'Values cannot be negative';
     }
-
     if (data.paid_flats > maxFlats) {
       return `Paid flats cannot exceed ${maxFlats} for tower ${tower}`;
     }
-
     if (data.pending_flats > maxFlats) {
       return `Pending flats cannot exceed ${maxFlats} for tower ${tower}`;
     }
-
     if (data.paid_flats + data.pending_flats > maxFlats) {
       return `Total (paid + pending) cannot exceed ${maxFlats} flats in ${MONTH_NAMES[month]}`;
     }
-
     return null;
   };
-
-  const handleInputChange = (
-    tower: string,
-    month: number,
-    field: 'paid_flats' | 'pending_flats' | 'dues_cleared_from_previous' | 'advance_payments' | 'cam_recon_flats',
-    value: string
-  ) => {
+  const handleInputChange = (tower: string, month: number, field: 'paid_flats' | 'pending_flats' | 'dues_cleared_from_previous' | 'advance_payments' | 'cam_recon_flats', value: string) => {
     const numValue = parseInt(value) || 0;
     const currentMonthData = camData[tower][month];
-
     const updatedMonthData = {
       ...currentMonthData,
       [field]: numValue,
       total_flats: TOWER_TOTAL_FLATS[tower]
     };
-
     setCamData(prev => ({
       ...prev,
       [tower]: {
@@ -385,18 +386,17 @@ export default function CAMTracking() {
         [month]: updatedMonthData
       }
     }));
-
     const error = validateTowerData(tower, month, updatedMonthData);
     setValidationErrors(prev => ({
       ...prev,
       [`${tower}-${month}`]: error || ''
     }));
   };
-
   const handleSaveTower = async (tower: string) => {
     if (!user) return;
-
-    const { months } = getCalendarYearAndMonths();
+    const {
+      months
+    } = getCalendarYearAndMonths();
     const towerMonthsData = camData[tower];
 
     // Validate all months first
@@ -407,7 +407,6 @@ export default function CAMTracking() {
         return;
       }
     }
-
     setSaving(true);
     try {
       const upsertData = months.map(month => {
@@ -415,7 +414,8 @@ export default function CAMTracking() {
         return {
           tower: data.tower,
           year: data.year,
-          quarter: data.quarter, // Calendar quarter
+          quarter: data.quarter,
+          // Calendar quarter
           month: month,
           paid_flats: data.paid_flats,
           pending_flats: data.pending_flats,
@@ -437,12 +437,12 @@ export default function CAMTracking() {
       // Supabase upsert matches on Primary Key by default, or we can specify `onConflict`.
 
       // Cast to any to bypass type checking until types.ts is regenerated
-      const { error } = await supabase
-        .from('cam_tracking')
-        .upsert(upsertData as any, { onConflict: 'tower,year,month' });
-
+      const {
+        error
+      } = await supabase.from('cam_tracking').upsert(upsertData as any, {
+        onConflict: 'tower,year,month'
+      });
       if (error) throw error;
-
       toast.success(`Tower ${tower} data saved as draft`);
       fetchCAMData();
     } catch (error: any) {
@@ -451,11 +451,11 @@ export default function CAMTracking() {
       setSaving(false);
     }
   };
-
   const handleSubmitTower = async (tower: string) => {
     if (!user) return;
-
-    const { months } = getCalendarYearAndMonths();
+    const {
+      months
+    } = getCalendarYearAndMonths();
     const towerMonthsData = camData[tower];
 
     // Validate all months first
@@ -472,63 +472,53 @@ export default function CAMTracking() {
       const data = towerMonthsData[month];
       return data.paid_flats > 0 || data.pending_flats > 0;
     });
-
     if (!hasData) {
       toast.error('Please enter data for all months before submitting');
       return;
     }
-
     setSaving(true);
     try {
-      const { calendarYear } = getCalendarYearAndMonths();
-
+      const {
+        calendarYear
+      } = getCalendarYearAndMonths();
       console.log('=== SUBMITTING CAM FOR APPROVAL ===');
       console.log('Tower:', tower);
       console.log('Year:', calendarYear);
       console.log('Months:', months);
 
       // Update status to 'submitted' for all months of this tower
-      const { error } = await supabase
-        .from('cam_tracking')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          uploaded_by: user.id
-        } as any)
-        .eq('tower', tower)
-        .eq('year', calendarYear)
-        .in('month', months);
-
+      const {
+        error
+      } = await supabase.from('cam_tracking').update({
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        uploaded_by: user.id
+      } as any).eq('tower', tower).eq('year', calendarYear).in('month', months);
       if (error) {
         console.error('CAM Submission Error:', error);
         throw error;
       }
-
       console.log('CAM submission update successful');
 
       // Send notification to treasurers (asynchronously, don't block on it)
       // Get the IDs of records that were just submitted
-      const { data: submittedRecords } = await supabase
-        .from('cam_tracking')
-        .select('id')
-        .eq('tower', tower)
-        .eq('year', calendarYear)
-        .in('month', months)
-        .eq('status', 'submitted');
-
+      const {
+        data: submittedRecords
+      } = await supabase.from('cam_tracking').select('id').eq('tower', tower).eq('year', calendarYear).in('month', months).eq('status', 'submitted');
       console.log('Submitted Records:', submittedRecords);
 
       // Send notifications for each record
       if (submittedRecords && submittedRecords.length > 0) {
         for (const record of submittedRecords) {
           supabase.functions.invoke('send-cam-notification', {
-            body: { camId: record.id, action: 'submitted' }
+            body: {
+              camId: record.id,
+              action: 'submitted'
+            }
           }).catch(err => console.error('Notification failed:', err));
         }
       }
-
       console.log('=== END CAM SUBMISSION ===');
-
       toast.success(`Tower ${tower} data submitted for approval`);
       fetchCAMData();
     } catch (error: any) {
@@ -537,31 +527,31 @@ export default function CAMTracking() {
       setSaving(false);
     }
   };
-
   const getTowerStatus = (tower: string): string => {
-    const { months } = getCalendarYearAndMonths();
+    const {
+      months
+    } = getCalendarYearAndMonths();
     const statuses = months.map(m => camData[tower]?.[m]?.status || 'draft');
-
     if (statuses.every(s => s === 'approved')) return 'approved';
     if (statuses.some(s => s === 'submitted')) return 'submitted';
     if (statuses.some(s => s === 'correction_pending')) return 'correction_pending';
     if (statuses.some(s => s === 'correction_approved')) return 'correction_approved';
     return 'draft';
   };
-
   const canEditTower = (tower: string): boolean => {
     const status = getTowerStatus(tower);
     return status === 'draft' || status === 'correction_approved';
   };
-
   const handleDownload = () => {
     if (!camData) return;
-
-    const { months } = getCalendarYearAndMonths();
+    const {
+      months
+    } = getCalendarYearAndMonths();
     const exportData: any[] = [];
-
     TOWERS.forEach(tower => {
-      const row: any = { Tower: tower };
+      const row: any = {
+        Tower: tower
+      };
       months.forEach(month => {
         const data = camData[tower]?.[month];
         if (data) {
@@ -574,32 +564,31 @@ export default function CAMTracking() {
       });
       exportData.push(row);
     });
-
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "CAM Data");
     XLSX.writeFile(wb, `CAM_Report_FY${selectedYear}_Q${selectedQuarter}.xlsx`);
   };
-
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, tower: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     if (!user) {
       toast.error('You must be logged in to upload files');
       return;
     }
-
     try {
       // Upload file to 'cam' bucket (private bucket for security)
       const fileExt = file.name.split('.').pop();
-      const { calendarYear, months } = getCalendarYearAndMonths();
+      const {
+        calendarYear,
+        months
+      } = getCalendarYearAndMonths();
       const fileName = `${tower}/${calendarYear}/Q${selectedQuarter}_${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('cam')
-        .upload(fileName, file, { upsert: true });
-
+      const {
+        error: uploadError
+      } = await supabase.storage.from('cam').upload(fileName, file, {
+        upsert: true
+      });
       if (uploadError) throw uploadError;
 
       // Store the file path (not public URL since bucket is private)
@@ -608,14 +597,12 @@ export default function CAMTracking() {
         ...prev,
         [tower]: fileName
       }));
-
       toast.success(`Supporting document uploaded for Tower ${tower}`);
     } catch (error: any) {
       toast.error('Failed to upload file: ' + error.message);
     }
     event.target.value = '';
   };
-
   const getTowerMonthData = (tower: string, month: number) => camData[tower]?.[month] || {
     tower,
     year: selectedYear,
@@ -628,20 +615,17 @@ export default function CAMTracking() {
     advance_payments: 0,
     cam_recon_flats: 0
   };
-
   const fetchMonthlyReports = async () => {
     try {
       setLoadingReports(true);
       const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
       const months = quarterConfig?.months || [];
-
-      const { data, error } = await supabase
-        .from('cam_monthly_reports')
-        .select('*')
-        .eq('year', selectedYear)
-        .in('month', months)
-        .order('month', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('cam_monthly_reports').select('*').eq('year', selectedYear).in('month', months).order('month', {
+        ascending: false
+      });
       if (error) throw error;
       setMonthlyReports(data as MonthlyReport[]);
     } catch (error: any) {
@@ -650,37 +634,33 @@ export default function CAMTracking() {
       setLoadingReports(false);
     }
   };
-
   const handleReportUpload = async (event: React.ChangeEvent<HTMLInputElement>, month: number, type: 'defaulters_list' | 'recon_list', tower?: string) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
-
     const targetTower = tower || selectedTower;
-
     try {
       setSaving(true);
       const fileExt = file.name.split('.').pop();
       const fileName = `monthly_reports/${selectedYear}/${targetTower}/${month}/${type}_${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('cam')
-        .upload(fileName, file, { upsert: true });
-
+      const {
+        error: uploadError
+      } = await supabase.storage.from('cam').upload(fileName, file, {
+        upsert: true
+      });
       if (uploadError) throw uploadError;
-
-      const { error: dbError } = await supabase
-        .from('cam_monthly_reports')
-        .upsert({
-          year: selectedYear,
-          month: month,
-          tower: targetTower,
-          report_type: type,
-          document_url: fileName,
-          uploaded_by: user.id
-        }, { onConflict: 'year,month,tower,report_type' });
-
+      const {
+        error: dbError
+      } = await supabase.from('cam_monthly_reports').upsert({
+        year: selectedYear,
+        month: month,
+        tower: targetTower,
+        report_type: type,
+        document_url: fileName,
+        uploaded_by: user.id
+      }, {
+        onConflict: 'year,month,tower,report_type'
+      });
       if (dbError) throw dbError;
-
       const reportLabel = type === 'defaulters_list' ? '20th Report (Without Recon)' : '30th Report (With Recon)';
       toast.success(`${reportLabel} uploaded for ${targetTower} - ${MONTH_NAMES[month]}`);
       fetchMonthlyReports();
@@ -691,15 +671,13 @@ export default function CAMTracking() {
       event.target.value = '';
     }
   };
-
   const downloadReport = async (report: MonthlyReport) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('cam')
-        .createSignedUrl(report.document_url, 3600);
-
+      const {
+        data,
+        error
+      } = await supabase.storage.from('cam').createSignedUrl(report.document_url, 3600);
       if (error) throw error;
-
       const link = document.createElement('a');
       link.href = data.signedUrl;
       link.download = `${report.report_type}_${MONTH_NAMES[report.month]}_${report.year}`;
@@ -711,17 +689,12 @@ export default function CAMTracking() {
       toast.error('Download failed: ' + error.message);
     }
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
+    return <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -743,9 +716,7 @@ export default function CAMTracking() {
             Discrepancy Check {discrepancyCount > 0 && `(${discrepancyCount})`}
           </TabsTrigger>
           <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
-          {userRole === 'lead' && (
-            <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>
-          )}
+          {userRole === 'lead' && <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="tower-entry" className="space-y-4">
@@ -757,31 +728,25 @@ export default function CAMTracking() {
                     <SelectValue placeholder="Select Tower" />
                   </SelectTrigger>
                   <SelectContent>
-                    {TOWERS.map(tower => (
-                      <SelectItem key={tower} value={tower}>
+                    {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
                         Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map(year => (
-                      <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>
-                    ))}
+                    {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+                <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="Quarter" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FISCAL_QUARTERS.map(q => (
-                      <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
-                    ))}
+                    {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -796,61 +761,28 @@ export default function CAMTracking() {
               </Alert>
 
               <div className="space-y-6">
-                {getCalendarYearAndMonths().months.map(month => (
-                  <div key={month} className="p-4 border rounded-lg bg-muted/20">
+                {getCalendarYearAndMonths().months.map(month => <div key={month} className="p-4 border rounded-lg bg-muted/20">
                     <h3 className="font-semibold mb-3 text-primary">{MONTH_NAMES[month]}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Paid Flats</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max={TOWER_TOTAL_FLATS[selectedTower]}
-                          value={getTowerMonthData(selectedTower, month).paid_flats || ''}
-                          onChange={(e) => handleInputChange(selectedTower, month, 'paid_flats', e.target.value)}
-                          placeholder="0"
-                        />
+                        <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).paid_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'paid_flats', e.target.value)} placeholder="0" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Pending Flats</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max={TOWER_TOTAL_FLATS[selectedTower]}
-                          value={getTowerMonthData(selectedTower, month).pending_flats || ''}
-                          onChange={(e) => handleInputChange(selectedTower, month, 'pending_flats', e.target.value)}
-                          placeholder="0"
-                        />
+                        <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).pending_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'pending_flats', e.target.value)} placeholder="0" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Dues Cleared</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={getTowerMonthData(selectedTower, month).dues_cleared_from_previous || ''}
-                          onChange={(e) => handleInputChange(selectedTower, month, 'dues_cleared_from_previous', e.target.value)}
-                          placeholder="0"
-                        />
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).dues_cleared_from_previous || ''} onChange={e => handleInputChange(selectedTower, month, 'dues_cleared_from_previous', e.target.value)} placeholder="0" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Advance</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={getTowerMonthData(selectedTower, month).advance_payments || ''}
-                          onChange={(e) => handleInputChange(selectedTower, month, 'advance_payments', e.target.value)}
-                          placeholder="0"
-                        />
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).advance_payments || ''} onChange={e => handleInputChange(selectedTower, month, 'advance_payments', e.target.value)} placeholder="0" />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">CAM Recon</label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={getTowerMonthData(selectedTower, month).cam_recon_flats || ''}
-                          onChange={(e) => handleInputChange(selectedTower, month, 'cam_recon_flats', e.target.value)}
-                          placeholder="0"
-                        />
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).cam_recon_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'cam_recon_flats', e.target.value)} placeholder="0" />
                       </div>
                     </div>
 
@@ -861,20 +793,13 @@ export default function CAMTracking() {
                         </label>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'defaulters_list');
-                            return report ? (
-                              <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
+                        const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'defaulters_list');
+                        return report ? <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
                                 <Download className="h-3 w-3" /> Download
-                              </Button>
-                            ) : null;
-                          })()}
+                              </Button> : null;
+                      })()}
                           <div className="relative">
-                            <input
-                              type="file"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={(e) => handleReportUpload(e, month, 'defaulters_list', selectedTower)}
-                              disabled={saving}
-                            />
+                            <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_list', selectedTower)} disabled={saving} />
                             <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
                               <Upload className="h-3 w-3" /> {monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'defaulters_list') ? 'Update 20th' : 'Upload 20th'}
                             </Button>
@@ -888,20 +813,13 @@ export default function CAMTracking() {
                         </label>
                         <div className="flex items-center gap-2">
                           {(() => {
-                            const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'recon_list');
-                            return report ? (
-                              <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
+                        const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'recon_list');
+                        return report ? <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
                                 <Download className="h-3 w-3" /> Download
-                              </Button>
-                            ) : null;
-                          })()}
+                              </Button> : null;
+                      })()}
                           <div className="relative">
-                            <input
-                              type="file"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={(e) => handleReportUpload(e, month, 'recon_list', selectedTower)}
-                              disabled={saving}
-                            />
+                            <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'recon_list', selectedTower)} disabled={saving} />
                             <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
                               <Upload className="h-3 w-3" /> {monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'recon_list') ? 'Update 30th' : 'Upload 30th'}
                             </Button>
@@ -909,11 +827,8 @@ export default function CAMTracking() {
                         </div>
                       </div>
                     </div>
-                    {validationErrors[`${selectedTower}-${month}`] && (
-                      <p className="text-sm text-destructive mt-2">{validationErrors[`${selectedTower}-${month}`]}</p>
-                    )}
-                  </div>
-                ))}
+                    {validationErrors[`${selectedTower}-${month}`] && <p className="text-sm text-destructive mt-2">{validationErrors[`${selectedTower}-${month}`]}</p>}
+                  </div>)}
               </div>
 
 
@@ -921,65 +836,33 @@ export default function CAMTracking() {
               <div className="flex items-center justify-between gap-3 pt-4 border-t">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <input
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      onChange={(e) => handleFileUpload(e, selectedTower)}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      disabled={!canEditTower(selectedTower)}
-                    />
+                    <input type="file" accept=".xlsx,.xls,.csv" onChange={e => handleFileUpload(e, selectedTower)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={!canEditTower(selectedTower)} />
                     <Button variant="outline" size="sm" disabled={!canEditTower(selectedTower)}>
                       <Upload className="h-4 w-4 mr-2" />
                       Upload
                     </Button>
                   </div>
 
-                  {supportingDocs[selectedTower] && (
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={supportingDocs[selectedTower]}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-blue-600 hover:underline flex items-center"
-                      >
+                  {supportingDocs[selectedTower] && <div className="flex items-center gap-2">
+                      <a href={supportingDocs[selectedTower]} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center">
                         <Download className="h-3 w-3 mr-1" />
                         View Document
                       </a>
-                    </div>
-                  )}
+                    </div>}
 
-                  <Button
-                    onClick={() => handleSaveTower(selectedTower)}
-                    disabled={saving || !!validationErrors[selectedTower] || !canEditTower(selectedTower)}
-                    variant="outline"
-                  >
+                  <Button onClick={() => handleSaveTower(selectedTower)} disabled={saving || !!validationErrors[selectedTower] || !canEditTower(selectedTower)} variant="outline">
                     {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                     Save Draft
                   </Button>
-                  {userRole === 'lead' && getTowerStatus(selectedTower) === 'draft' && (
-                    <Button
-                      onClick={() => handleSubmitTower(selectedTower)}
-                      disabled={saving}
-                    >
+                  {userRole === 'lead' && getTowerStatus(selectedTower) === 'draft' && <Button onClick={() => handleSubmitTower(selectedTower)} disabled={saving}>
                       {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
                       Submit for Approval
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground mb-1">Status</p>
-                  <Badge variant={
-                    getTowerStatus(selectedTower) === 'approved' ? 'default' :
-                      getTowerStatus(selectedTower) === 'submitted' ? 'secondary' :
-                        getTowerStatus(selectedTower) === 'correction_pending' ? 'destructive' :
-                          'outline'
-                  }>
-                    {getTowerStatus(selectedTower) === 'draft' ? 'Draft' :
-                      getTowerStatus(selectedTower) === 'submitted' ? 'Pending Approval' :
-                        getTowerStatus(selectedTower) === 'approved' ? 'Approved' :
-                          getTowerStatus(selectedTower) === 'correction_pending' ? 'Correction Pending' :
-                            getTowerStatus(selectedTower) === 'correction_approved' ? 'Edit Allowed' :
-                              'Draft'}
+                  <Badge variant={getTowerStatus(selectedTower) === 'approved' ? 'default' : getTowerStatus(selectedTower) === 'submitted' ? 'secondary' : getTowerStatus(selectedTower) === 'correction_pending' ? 'destructive' : 'outline'}>
+                    {getTowerStatus(selectedTower) === 'draft' ? 'Draft' : getTowerStatus(selectedTower) === 'submitted' ? 'Pending Approval' : getTowerStatus(selectedTower) === 'approved' ? 'Approved' : getTowerStatus(selectedTower) === 'correction_pending' ? 'Correction Pending' : getTowerStatus(selectedTower) === 'correction_approved' ? 'Edit Allowed' : 'Draft'}
                   </Badge>
                 </div>
               </div>
@@ -993,30 +876,24 @@ export default function CAMTracking() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <CardTitle className="text-lg">All Towers - {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.label} {selectedYear}</CardTitle>
                 <div className="flex items-center gap-3">
-                  {(userRole === 'treasurer' || userRole === 'lead') && (
-                    <Button variant="outline" size="sm" onClick={handleDownload}>
+                  {(userRole === 'treasurer' || userRole === 'lead') && <Button variant="outline" size="sm" onClick={handleDownload}>
                       <Download className="h-4 w-4 mr-2" />
                       Download Report
-                    </Button>
-                  )}
-                  <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                    </Button>}
+                  <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
-                      {years.map(year => (
-                        <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>
-                      ))}
+                      {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+                  <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Quarter" />
                     </SelectTrigger>
                     <SelectContent>
-                      {FISCAL_QUARTERS.map(q => (
-                        <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
-                      ))}
+                      {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1029,55 +906,44 @@ export default function CAMTracking() {
                     <TableRow>
                       <TableHead className="w-[80px]">Tower</TableHead>
                       <TableHead className="w-[80px]">Total</TableHead>
-                      {getCalendarYearAndMonths().months.map(m => (
-                        <TableHead key={m} className="text-center border-l" colSpan={2}>{MONTH_NAMES[m]}</TableHead>
-                      ))}
+                      {getCalendarYearAndMonths().months.map(m => <TableHead key={m} className="text-center border-l" colSpan={2}>{MONTH_NAMES[m]}</TableHead>)}
                     </TableRow>
                     <TableRow>
                       <TableHead></TableHead>
                       <TableHead></TableHead>
-                      {getCalendarYearAndMonths().months.map(m => (
-                        <>
+                      {getCalendarYearAndMonths().months.map(m => <>
                           <TableHead key={`${m}-paid`} className="text-xs text-center border-l text-green-600">Paid</TableHead>
                           <TableHead key={`${m}-pending`} className="text-xs text-center text-red-600">Pending</TableHead>
-                        </>
-                      ))}
+                        </>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {TOWERS.map(tower => {
-                      const maxFlats = TOWER_TOTAL_FLATS[tower];
-                      const months = getCalendarYearAndMonths().months;
-
-                      return (
-                        <TableRow key={tower}>
+                    const maxFlats = TOWER_TOTAL_FLATS[tower];
+                    const months = getCalendarYearAndMonths().months;
+                    return <TableRow key={tower}>
                           <TableCell className="font-medium">{tower}</TableCell>
                           <TableCell>{maxFlats}</TableCell>
                           {months.map(m => {
-                            const data = getTowerMonthData(tower, m);
-                            return (
-                              <>
+                        const data = getTowerMonthData(tower, m);
+                        return <>
                                 <TableCell className="text-center border-l text-green-600">{data.paid_flats}</TableCell>
                                 <TableCell className="text-center text-red-600">{data.pending_flats}</TableCell>
-                              </>
-                            );
-                          })}
-                        </TableRow>
-                      );
-                    })}
+                              </>;
+                      })}
+                        </TableRow>;
+                  })}
                     <TableRow className="bg-muted/50 font-semibold">
                       <TableCell>Total</TableCell>
                       <TableCell>{TOTAL_FLATS_IN_COMPLEX}</TableCell>
                       {getCalendarYearAndMonths().months.map(m => {
-                        const totalPaid = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.paid_flats || 0), 0);
-                        const totalPending = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.pending_flats || 0), 0);
-                        return (
-                          <>
+                      const totalPaid = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.paid_flats || 0), 0);
+                      const totalPending = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.pending_flats || 0), 0);
+                      return <>
                             <TableCell className="text-center border-l text-green-600">{totalPaid}</TableCell>
                             <TableCell className="text-center text-red-600">{totalPending}</TableCell>
-                          </>
-                        );
-                      })}
+                          </>;
+                    })}
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -1094,8 +960,7 @@ export default function CAMTracking() {
           <QuarterlySummary />
         </TabsContent>
 
-        {userRole === 'lead' && (
-          <TabsContent value="drafts">
+        {userRole === 'lead' && <TabsContent value="drafts">
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -1105,39 +970,29 @@ export default function CAMTracking() {
                       Select records to submit for approval
                     </p>
                   </div>
-                  {selectedDrafts.size > 0 && (
-                    <Button onClick={handleBulkSubmit} disabled={saving}>
+                  {selectedDrafts.size > 0 && <Button onClick={handleBulkSubmit} disabled={saving}>
                       <Send className="w-4 h-4 mr-2" />
                       Submit {selectedDrafts.size} Record{selectedDrafts.size > 1 ? 's' : ''}
-                    </Button>
-                  )}
+                    </Button>}
                 </div>
               </CardHeader>
               <CardContent>
-                {loadingDrafts ? (
-                  <div className="flex justify-center py-8">
+                {loadingDrafts ? <div className="flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : draftRecords.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground">
+                  </div> : draftRecords.length === 0 ? <p className="text-center py-8 text-muted-foreground">
                     No draft records found. All data has been submitted.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
+                  </p> : <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-12">
-                            <Checkbox
-                              checked={selectedDrafts.size === draftRecords.length && draftRecords.length > 0}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedDrafts(new Set(draftRecords.map(r => r.id)));
-                                } else {
-                                  setSelectedDrafts(new Set());
-                                }
-                              }}
-                            />
+                            <Checkbox checked={selectedDrafts.size === draftRecords.length && draftRecords.length > 0} onCheckedChange={checked => {
+                        if (checked) {
+                          setSelectedDrafts(new Set(draftRecords.map(r => r.id)));
+                        } else {
+                          setSelectedDrafts(new Set());
+                        }
+                      }} />
                           </TableHead>
                           <TableHead>Tower</TableHead>
                           <TableHead>Month</TableHead>
@@ -1149,21 +1004,17 @@ export default function CAMTracking() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {draftRecords.map((record) => (
-                          <TableRow key={record.id}>
+                        {draftRecords.map(record => <TableRow key={record.id}>
                             <TableCell>
-                              <Checkbox
-                                checked={selectedDrafts.has(record.id)}
-                                onCheckedChange={(checked) => {
-                                  const newSelected = new Set(selectedDrafts);
-                                  if (checked) {
-                                    newSelected.add(record.id);
-                                  } else {
-                                    newSelected.delete(record.id);
-                                  }
-                                  setSelectedDrafts(newSelected);
-                                }}
-                              />
+                              <Checkbox checked={selectedDrafts.has(record.id)} onCheckedChange={checked => {
+                        const newSelected = new Set(selectedDrafts);
+                        if (checked) {
+                          newSelected.add(record.id);
+                        } else {
+                          newSelected.delete(record.id);
+                        }
+                        setSelectedDrafts(newSelected);
+                      }} />
                             </TableCell>
                             <TableCell className="font-medium">{record.tower}</TableCell>
                             <TableCell>
@@ -1174,16 +1025,13 @@ export default function CAMTracking() {
                             <TableCell className="text-right">{record.total_flats}</TableCell>
                             <TableCell className="text-right">{record.dues_cleared_from_previous}</TableCell>
                             <TableCell className="text-right">{record.advance_payments}</TableCell>
-                          </TableRow>
-                        ))}
+                          </TableRow>)}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
             </Card>
-          </TabsContent>
-        )}
+          </TabsContent>}
 
         <TabsContent value="monthly-reports">
           <Card>
@@ -1198,35 +1046,29 @@ export default function CAMTracking() {
                       <SelectValue placeholder="Select Tower" />
                     </SelectTrigger>
                     <SelectContent>
-                      {TOWERS.map(tower => (
-                        <SelectItem key={tower} value={tower}>
+                      {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
                           Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
-                        </SelectItem>
-                      ))}
+                        </SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+                  <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
-                      {years.map(year => (
-                        <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>
-                      ))}
+                      {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Select value={String(selectedQuarter)} onValueChange={(v) => setSelectedQuarter(Number(v))}>
+                  <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
                     <SelectTrigger className="w-[150px]">
                       <SelectValue placeholder="Quarter" />
                     </SelectTrigger>
                     <SelectContent>
-                      {FISCAL_QUARTERS.map(q => (
-                        <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>
-                      ))}
+                      {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <div className="text-sm text-muted-foreground">
-                    <p>Lead users upload Defaulters List on 30th and Recon List on 20th for each tower.</p>
+                    
                   </div>
                 </div>
 
@@ -1242,69 +1084,46 @@ export default function CAMTracking() {
                     </TableHeader>
                     <TableBody>
                       {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.months.slice().reverse().map(month => {
-                        const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
+                      const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
 
-                        // Show reports for the currently selected tower in this tab too
-                        const defaulterReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'defaulters_list');
-                        const reconReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'recon_list');
-
-                        return (
-                          <TableRow key={month}>
+                      // Show reports for the currently selected tower in this tab too
+                      const defaulterReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'defaulters_list');
+                      const reconReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'recon_list');
+                      return <TableRow key={month}>
                             <TableCell className="font-medium text-xs">{MONTH_NAMES[month]} {mYear}</TableCell>
                             <TableCell className="text-xs font-bold">Tower {selectedTower}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                {defaulterReport ? (
-                                  <Button variant="ghost" size="sm" onClick={() => downloadReport(defaulterReport)}>
+                                {defaulterReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(defaulterReport)}>
                                     <Download className="h-4 w-4 mr-2" />
                                     Download
-                                  </Button>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">Not uploaded</span>
-                                )}
-                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && (
-                                  <div className="relative">
-                                    <input
-                                      type="file"
-                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                      onChange={(e) => handleReportUpload(e, month, 'defaulters_list', selectedTower)}
-                                    />
+                                  </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_list', selectedTower)} />
                                     <Button variant="outline" size="sm">
                                       <Upload className="h-3 w-3 mr-1" />
                                       {defaulterReport ? 'Update' : 'Upload'}
                                     </Button>
-                                  </div>
-                                )}
+                                  </div>}
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                {reconReport ? (
-                                  <Button variant="ghost" size="sm" onClick={() => downloadReport(reconReport)}>
+                                {reconReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(reconReport)}>
                                     <Download className="h-4 w-4 mr-2" />
                                     Download
-                                  </Button>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">Not uploaded</span>
-                                )}
-                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && (
-                                  <div className="relative">
-                                    <input
-                                      type="file"
-                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                      onChange={(e) => handleReportUpload(e, month, 'recon_list', selectedTower)}
-                                    />
+                                  </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'recon_list', selectedTower)} />
                                     <Button variant="outline" size="sm">
                                       <Upload className="h-3 w-3 mr-1" />
                                       {reconReport ? 'Update' : 'Upload'}
                                     </Button>
-                                  </div>
-                                )}
+                                  </div>}
                               </div>
                             </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                          </TableRow>;
+                    })}
                     </TableBody>
                   </Table>
                 </div>
@@ -1313,30 +1132,26 @@ export default function CAMTracking() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 }
-
 function QuarterlySummary() {
   const [loading, setLoading] = useState(true);
   const [summaryData, setSummaryData] = useState<CAMData[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
-  const years = Array.from({ length: new Date().getFullYear() - 2023 }, (_, i) => 2024 + i);
-
+  const years = Array.from({
+    length: new Date().getFullYear() - 2023
+  }, (_, i) => 2024 + i);
   useEffect(() => {
     fetchSummary();
   }, [selectedYear]);
-
   const fetchSummary = async () => {
     setLoading(true);
     try {
       // Fetch data for the fiscal year (Apr of selectedYear to Mar of selectedYear + 1)
-      const { data, error } = await supabase
-        .from('cam_tracking')
-        .select('*')
-        .or(`and(year.eq.${selectedYear},month.gte.4),and(year.eq.${selectedYear + 1},month.lte.3)`);
-
+      const {
+        data,
+        error
+      } = await supabase.from('cam_tracking').select('*').or(`and(year.eq.${selectedYear},month.gte.4),and(year.eq.${selectedYear + 1},month.lte.3)`);
       if (error) throw error;
       setSummaryData(data || []);
     } catch (error: any) {
@@ -1345,16 +1160,19 @@ function QuarterlySummary() {
       setLoading(false);
     }
   };
-
   const getQuarterTotals = (quarter: number) => {
     const quarterConfig = FISCAL_QUARTERS.find(q => q.value === quarter);
-    if (!quarterConfig) return { paid: 0, pending: 0, duesCleared: 0, advance: 0, total: TOTAL_FLATS_IN_COMPLEX };
-
+    if (!quarterConfig) return {
+      paid: 0,
+      pending: 0,
+      duesCleared: 0,
+      advance: 0,
+      total: TOTAL_FLATS_IN_COMPLEX
+    };
     const qData = summaryData.filter(d => quarterConfig.months.includes(d.month || 0));
 
     // Group data by tower to find the latest month for each tower
     const towerLatestData: Record<string, CAMData> = {};
-
     qData.forEach(d => {
       if (!towerLatestData[d.tower] || (d.month || 0) > (towerLatestData[d.tower].month || 0)) {
         towerLatestData[d.tower] = d;
@@ -1369,7 +1187,6 @@ function QuarterlySummary() {
     // For Total Demand: Since it's a quarterly invoice, the demand is just the total flats (1 invoice per flat)
     // We don't multiply by 3 anymore.
     const totalDemand = TOTAL_FLATS_IN_COMPLEX;
-
     return {
       paid: totalPaid,
       pending: totalPending,
@@ -1379,35 +1196,27 @@ function QuarterlySummary() {
       total: totalDemand
     };
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
+    return <div className="flex items-center justify-center min-h-[200px]">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-4">
+  return <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+        <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
           <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Year" />
           </SelectTrigger>
           <SelectContent>
-            {years.map(year => (
-              <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>
-            ))}
+            {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {FISCAL_QUARTERS.map(q => {
-          const totals = getQuarterTotals(q.value);
-          return (
-            <Card key={q.value}>
+        const totals = getQuarterTotals(q.value);
+        return <Card key={q.value}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{q.label}</CardTitle>
               </CardHeader>
@@ -1432,18 +1241,15 @@ function QuarterlySummary() {
                   <span className="text-muted-foreground">Advance Paid:</span>
                   <span className="font-medium text-purple-600">{totals.advance}</span>
                 </div>
-                {totals.paid > 0 && (
-                  <div className="pt-2 border-t">
+                {totals.paid > 0 && <div className="pt-2 border-t">
                     <div className="text-xs text-muted-foreground">Collection Rate</div>
                     <div className="text-lg font-bold">
-                      {((totals.paid / totals.total) * 100).toFixed(1)}%
+                      {(totals.paid / totals.total * 100).toFixed(1)}%
                     </div>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
-            </Card>
-          );
-        })}
+            </Card>;
+      })}
       </div>
 
       <Card>
@@ -1457,50 +1263,45 @@ function QuarterlySummary() {
                 <TableRow>
                   <TableHead>Tower</TableHead>
                   <TableHead className="text-center">Total Flats</TableHead>
-                  {FISCAL_QUARTERS.map(q => (
-                    <TableHead key={q.value} className="text-center">{q.label}</TableHead>
-                  ))}
+                  {FISCAL_QUARTERS.map(q => <TableHead key={q.value} className="text-center">{q.label}</TableHead>)}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {TOWERS.map(tower => (
-                  <TableRow key={tower}>
+                {TOWERS.map(tower => <TableRow key={tower}>
                     <TableCell className="font-medium">{tower}</TableCell>
                     <TableCell className="text-center">{TOWER_TOTAL_FLATS[tower]}</TableCell>
                     {FISCAL_QUARTERS.map(q => {
-                      const qMonths = q.months;
-                      const towerData = summaryData.filter(d => d.tower === tower && qMonths.includes(d.month || 0));
+                  const qMonths = q.months;
+                  const towerData = summaryData.filter(d => d.tower === tower && qMonths.includes(d.month || 0));
 
-                      // Find the record for the latest month in this quarter
-                      // We sort simply by finding the max month
-                      const latestRecord = towerData.reduce<CAMData | null>((prev, current) => {
-                        return (!prev || (current.month || 0) > (prev.month || 0)) ? current : prev;
-                      }, null);
+                  // Find the record for the latest month in this quarter
+                  // We sort simply by finding the max month
+                  const latestRecord = towerData.reduce<CAMData | null>((prev, current) => {
+                    return !prev || (current.month || 0) > (prev.month || 0) ? current : prev;
+                  }, null);
 
-                      // Use pending flats from the latest record, or 0 if no data
-                      const totalPending = latestRecord ? latestRecord.pending_flats : 0;
-
-                      return (
-                        <TableCell key={q.value} className="text-center">
+                  // Use pending flats from the latest record, or 0 if no data
+                  const totalPending = latestRecord ? latestRecord.pending_flats : 0;
+                  return <TableCell key={q.value} className="text-center">
                           <span className={totalPending > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
                             {totalPending}
                           </span>
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
+                        </TableCell>;
+                })}
+                  </TableRow>)}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
-
 function DiscrepancyReport() {
-  const { user, userRole, loading: authLoading } = useAuth();
+  const {
+    user,
+    userRole,
+    loading: authLoading
+  } = useAuth();
   const [loading, setLoading] = useState(true);
   const [discrepancies, setDiscrepancies] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -1515,22 +1316,17 @@ function DiscrepancyReport() {
   useEffect(() => {
     checkDiscrepancies();
   }, [selectedYear]);
-
   const checkDiscrepancies = async () => {
     setLoading(true);
     try {
       // Fetch all data for the fiscal year
-      const { data, error } = await supabase
-        .from('cam_tracking')
-        .select('*')
-        .or(`and(year.eq.${selectedYear},month.gte.4),and(year.eq.${selectedYear + 1},month.lte.3)`)
-        .order('tower')
-        .order('month');
-
+      const {
+        data,
+        error
+      } = await supabase.from('cam_tracking').select('*').or(`and(year.eq.${selectedYear},month.gte.4),and(year.eq.${selectedYear + 1},month.lte.3)`).order('tower').order('month');
       if (error) throw error;
       const records = data as CAMDataFromDB[];
       const foundDiscrepancies: any[] = [];
-
       TOWERS.forEach(tower => {
         // Check each quarter
         FISCAL_QUARTERS.forEach(quarter => {
@@ -1539,16 +1335,13 @@ function DiscrepancyReport() {
 
           // Sort by month index to ensure order
           towerQData.sort((a, b) => qMonths.indexOf(a.month || 0) - qMonths.indexOf(b.month || 0));
-
           if (towerQData.length < 2) return; // Need at least 2 months to compare
 
           let previousPending = -1;
           let previousMonth = -1;
-
           towerQData.forEach(record => {
             const currentPending = record.pending_flats;
             const currentMonth = record.month || 0;
-
             if (previousPending !== -1) {
               // Check logic: Pending should not increase
               if (currentPending > previousPending) {
@@ -1561,7 +1354,8 @@ function DiscrepancyReport() {
                   val1: previousPending,
                   month2: MONTH_NAMES[currentMonth],
                   val2: currentPending,
-                  type: 'Pending count increased', // "Impossible" increase
+                  type: 'Pending count increased',
+                  // "Impossible" increase
                   description: `Pending count increased from ${previousPending} (${MONTH_NAMES[previousMonth]}) to ${currentPending} (${MONTH_NAMES[currentMonth]})`
                 });
               }
@@ -1571,7 +1365,6 @@ function DiscrepancyReport() {
           });
         });
       });
-
       setDiscrepancies(foundDiscrepancies);
     } catch (error: any) {
       toast.error('Error checking discrepancies: ' + error.message);
@@ -1579,22 +1372,18 @@ function DiscrepancyReport() {
       setLoading(false);
     }
   };
-
   const sendAlert = async (item: any) => {
     if (!user) return;
     setSendingAlert(true);
     try {
       // Find lead users to notify
-      const { data: leadRoles } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'lead');
-
+      const {
+        data: leadRoles
+      } = await supabase.from('user_roles').select('user_id').eq('role', 'lead');
       if (!leadRoles || leadRoles.length === 0) {
         toast.error("No lead users found to alert");
         return;
       }
-
       const notifications = leadRoles.map(lead => ({
         user_id: lead.user_id,
         type: 'data_discrepancy',
@@ -1602,10 +1391,10 @@ function DiscrepancyReport() {
         message: `${item.description}. Please verify data.`,
         created_by: user.id
       }));
-
-      const { error } = await supabase.from('notifications').insert(notifications);
+      const {
+        error
+      } = await supabase.from('notifications').insert(notifications);
       if (error) throw error;
-
       toast.success("Alert sent to Lead users");
     } catch (error: any) {
       toast.error("Failed to send alert: " + error.message);
@@ -1613,16 +1402,12 @@ function DiscrepancyReport() {
       setSendingAlert(false);
     }
   };
-
   const navigateToCorrectEntry = (item: any) => {
     // Navigate to CAM Tracking with the tower and quarter pre-selected
     window.location.href = `/cam-tracking?tower=${item.tower}&quarter=${item.quarterValue}&year=${selectedYear}`;
   };
-
   if (loading || authLoading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
-
-  return (
-    <Card>
+  return <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-amber-600">
           <AlertCircle className="h-5 w-5" />
@@ -1633,15 +1418,12 @@ function DiscrepancyReport() {
         </p>
       </CardHeader>
       <CardContent>
-        {discrepancies.length === 0 ? (
-          <div className="text-center py-8 text-green-600 flex flex-col items-center">
+        {discrepancies.length === 0 ? <div className="text-center py-8 text-green-600 flex flex-col items-center">
             <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
               <span className="text-xl">✓</span>
             </div>
             <p>No logical discrepancies found in pending counts.</p>
-          </div>
-        ) : (
-          <div className="rounded-md border">
+          </div> : <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1653,8 +1435,7 @@ function DiscrepancyReport() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {discrepancies.map((item, idx) => (
-                  <TableRow key={idx}>
+                {discrepancies.map((item, idx) => <TableRow key={idx}>
                     <TableCell className="font-medium">{item.tower}</TableCell>
                     <TableCell>{item.quarter}</TableCell>
                     <TableCell>
@@ -1664,25 +1445,18 @@ function DiscrepancyReport() {
                     </TableCell>
                     <TableCell>{item.description}</TableCell>
                     <TableCell className="text-right">
-                      {userRole === 'treasurer' ? (
-                        <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
+                      {userRole === 'treasurer' ? <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
                           <Send className="h-4 w-4 mr-1" />
                           Alert Lead
-                        </Button>
-                      ) : userRole === 'lead' ? (
-                        <Button size="sm" variant="outline" onClick={() => navigateToCorrectEntry(item)}>
+                        </Button> : userRole === 'lead' ? <Button size="sm" variant="outline" onClick={() => navigateToCorrectEntry(item)}>
                           <FileText className="h-4 w-4 mr-1" />
                           Correct Entry
-                        </Button>
-                      ) : null}
+                        </Button> : null}
                     </TableCell>
-                  </TableRow>
-                ))}
+                  </TableRow>)}
               </TableBody>
             </Table>
-          </div>
-        )}
+          </div>}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
