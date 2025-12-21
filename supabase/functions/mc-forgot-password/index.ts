@@ -120,9 +120,9 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Password reset email send result:", emailResponse);
+    console.log("Password reset email send result:", JSON.stringify(emailResponse, null, 2));
     if ((emailResponse as any)?.error) {
-      console.error("Resend password reset email error:", (emailResponse as any).error);
+      console.error("Resend password reset email error:", JSON.stringify((emailResponse as any).error, null, 2));
       throw new Error((emailResponse as any).error?.message || "Failed to send password reset email");
     }
 

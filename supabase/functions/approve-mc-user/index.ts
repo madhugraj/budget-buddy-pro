@@ -123,9 +123,10 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
-      console.log("Rejection email send result:", rejectionEmail);
+      console.log("Rejection email send result:", JSON.stringify(rejectionEmail, null, 2));
+
       if ((rejectionEmail as any)?.error) {
-        console.error("Resend rejection email error:", (rejectionEmail as any).error);
+        console.error("Resend rejection email error:", JSON.stringify((rejectionEmail as any).error, null, 2));
         throw new Error((rejectionEmail as any).error?.message || "Failed to send rejection email");
       }
 
@@ -228,9 +229,10 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Approval email send result:", emailResponse);
+    console.log("Approval email send result:", JSON.stringify(emailResponse, null, 2));
+
     if ((emailResponse as any)?.error) {
-      console.error("Resend approval email error:", (emailResponse as any).error);
+      console.error("Resend approval email error:", JSON.stringify((emailResponse as any).error, null, 2));
       throw new Error((emailResponse as any).error?.message || "Failed to send approval email");
     }
     return new Response(
