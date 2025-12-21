@@ -118,14 +118,13 @@ export function ExportCAM() {
 
   const fetchMonthlyReports = async () => {
     try {
-      const calendarYear = selectedQuarter === 4 ? selectedYear + 1 : selectedYear;
       const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
       const months = quarterConfig?.months || [];
 
-      let query = supabase
+      let query = (supabase as any)
         .from('cam_monthly_reports')
         .select('*')
-        .eq('year', selectedYear) // In our DB, we store the start year of FY
+        .eq('year', selectedYear)
         .in('month', months);
 
       if (mcUser) {
@@ -138,9 +137,17 @@ export function ExportCAM() {
 
       if (error) throw error;
 
+      const rows = (data || []) as Array<{
+        year: number;
+        month: number;
+        report_type: 'defaulters_list' | 'recon_list';
+        document_url: string;
+        status?: string | null;
+      }>;
+
       // Group by year and month
       const grouped: Record<string, any> = {};
-      (data || []).forEach(row => {
+      rows.forEach((row) => {
         const key = `${row.year}-${row.month}`;
         if (!grouped[key]) {
           grouped[key] = {
@@ -149,7 +156,7 @@ export function ExportCAM() {
             month: row.month,
             status: row.status || 'draft',
             defaulters_list_url: null,
-            recon_list_url: null
+            recon_list_url: null,
           };
         }
         if (row.report_type === 'defaulters_list') {
@@ -180,7 +187,7 @@ export function ExportCAM() {
 
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
+      const { error: dbError } = await (supabase as any)
         .from('cam_monthly_reports')
         .upsert({
           year: year,
@@ -188,7 +195,7 @@ export function ExportCAM() {
           tower: mcUser.tower_no,
           report_type: type,
           document_url: fileName,
-          uploaded_by: mcUser.id
+          uploaded_by: mcUser.id,
         }, { onConflict: 'year,month,tower,report_type' });
 
       if (dbError) throw dbError;
