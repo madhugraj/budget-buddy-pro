@@ -69,7 +69,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send password reset email
     const emailResponse = await resend.emails.send({
-      from: "Prestige Bella Vista <onboarding@resend.dev>",
+      from: "Prestige Bella Vista <pbv.mc.2527@gmail.com>",
+      reply_to: "pbv.mc.2527@gmail.com",
       to: [mcUser.email],
       subject: "Prestige Bella Vista - Password Reset",
       html: `
@@ -102,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <p style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 8px; font-size: 14px; margin-top: 15px;">
-              🚨 If you did not request this reset, please contact the administration immediately.
+              🚨 If you did not request this reset, please reply to this email immediately.
             </p>
             
             <p style="margin-top: 30px; color: #333;">
@@ -119,7 +120,11 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Password reset email sent:", emailResponse);
+    console.log("Password reset email send result:", emailResponse);
+    if ((emailResponse as any)?.error) {
+      console.error("Resend password reset email error:", (emailResponse as any).error);
+      throw new Error((emailResponse as any).error?.message || "Failed to send password reset email");
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: "Password reset email sent" }),
