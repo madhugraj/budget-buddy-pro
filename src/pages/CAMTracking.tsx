@@ -114,7 +114,7 @@ interface CAMDataFromDB {
   total_flats: number;
   dues_cleared_from_previous: number;
   advance_payments: number;
-  cam_recon_flats: number;
+  cam_recon_flats?: number | null;
   notes: string | null;
   is_locked: boolean;
   status: string;
@@ -122,14 +122,17 @@ interface CAMDataFromDB {
   updated_at: string;
   document_url?: string | null;
 }
+
 interface MonthlyReport {
   id: string;
   year: number;
   month: number;
+  tower: string;
   report_type: 'defaulters_list' | 'recon_list';
   document_url: string;
   uploaded_at: string;
   uploaded_by: string;
+  status?: string | null;
 }
 export default function CAMTracking() {
   const {
@@ -620,14 +623,16 @@ export default function CAMTracking() {
       setLoadingReports(true);
       const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
       const months = quarterConfig?.months || [];
-      const {
-        data,
-        error
-      } = await supabase.from('cam_monthly_reports').select('*').eq('year', selectedYear).in('month', months).order('month', {
-        ascending: false
-      });
+
+      const { data, error } = await (supabase as any)
+        .from('cam_monthly_reports')
+        .select('*')
+        .eq('year', selectedYear)
+        .in('month', months)
+        .order('month', { ascending: false });
+
       if (error) throw error;
-      setMonthlyReports(data as MonthlyReport[]);
+      setMonthlyReports((data || []) as MonthlyReport[]);
     } catch (error: any) {
       console.error('Error fetching monthly reports:', error);
     } finally {
@@ -642,24 +647,24 @@ export default function CAMTracking() {
       setSaving(true);
       const fileExt = file.name.split('.').pop();
       const fileName = `monthly_reports/${selectedYear}/${targetTower}/${month}/${type}_${Date.now()}.${fileExt}`;
-      const {
-        error: uploadError
-      } = await supabase.storage.from('cam').upload(fileName, file, {
+      const { error: uploadError } = await supabase.storage.from('cam').upload(fileName, file, {
         upsert: true
       });
       if (uploadError) throw uploadError;
-      const {
-        error: dbError
-      } = await supabase.from('cam_monthly_reports').upsert({
-        year: selectedYear,
-        month: month,
-        tower: targetTower,
-        report_type: type,
-        document_url: fileName,
-        uploaded_by: user.id
-      }, {
-        onConflict: 'year,month,tower,report_type'
-      });
+
+      const { error: dbError } = await (supabase as any)
+        .from('cam_monthly_reports')
+        .upsert({
+          year: selectedYear,
+          month: month,
+          tower: targetTower,
+          report_type: type,
+          document_url: fileName,
+          uploaded_by: user.id
+        }, {
+          onConflict: 'year,month,tower,report_type'
+        });
+
       if (dbError) throw dbError;
       const reportLabel = type === 'defaulters_list' ? '20th Report (Without Recon)' : '30th Report (With Recon)';
       toast.success(`${reportLabel} uploaded for ${targetTower} - ${MONTH_NAMES[month]}`);
