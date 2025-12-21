@@ -96,8 +96,9 @@ const handler = async (req: Request): Promise<Response> => {
       if (updateError) throw updateError;
 
       // Send rejection email
-      await resend.emails.send({
-        from: "Prestige Bella Vista <onboarding@resend.dev>",
+      const rejectionEmail = await resend.emails.send({
+        from: "Prestige Bella Vista <pbv.mc.2527@gmail.com>",
+        reply_to: "pbv.mc.2527@gmail.com",
         to: [mcUser.email],
         subject: "Prestige Bella Vista - MC Registration Update",
         html: `
@@ -112,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
               <p>Thank you for your interest in joining the Management Committee at Prestige Bella Vista.</p>
               <p>After careful review, we regret to inform you that your registration has not been approved at this time.</p>
               ${rejection_reason ? `<div style="background: #fef3cd; border-left: 4px solid #856404; padding: 15px; margin: 20px 0;"><strong>Reason:</strong> ${rejection_reason}</div>` : ''}
-              <p>If you have any questions or would like to discuss this decision, please feel free to contact the society administration.</p>
+              <p>If you have any questions or would like to discuss this decision, please reply to this email.</p>
               <p style="margin-top: 30px;">Warm regards,<br><strong>Treasurer</strong><br>Prestige Bella Vista Management</p>
             </div>
             <div style="text-align: center; padding: 20px; color: #888; font-size: 12px;">
@@ -121,6 +122,12 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
         `,
       });
+
+      console.log("Rejection email send result:", rejectionEmail);
+      if ((rejectionEmail as any)?.error) {
+        console.error("Resend rejection email error:", (rejectionEmail as any).error);
+        throw new Error((rejectionEmail as any).error?.message || "Failed to send rejection email");
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: "MC user rejected" }),
@@ -161,7 +168,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send approval email with credentials
     const emailResponse = await resend.emails.send({
-      from: "Prestige Bella Vista <onboarding@resend.dev>",
+      from: "Prestige Bella Vista <pbv.mc.2527@gmail.com>",
+      reply_to: "pbv.mc.2527@gmail.com",
       to: [mcUser.email],
       subject: "🎉 Welcome to Prestige Bella Vista Management Committee!",
       html: `
@@ -174,7 +182,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="background: #fff; padding: 30px; border: 1px solid #e0d6c8; border-top: none;">
             <p style="font-size: 18px; color: #333;">Dear <strong>${mcUser.name}</strong>,</p>
             
-            <p style="color: #555; line-height: 1.6;">Congratulations! Your registration to join the <strong>Prestige Bella Vista Management Committee</strong> has been approved. We are delighted to have you as part of our vibrant community.</p>
+            <p style="color: #555; line-height: 1.6;">Congratulations! Your registration to join the <strong>Prestige Bella Vista Management Committee</strong> has been approved.</p>
             
             <div style="background: linear-gradient(135deg, #f8f4f0 0%, #fff 100%); border: 2px solid #8B4513; border-radius: 10px; padding: 25px; margin: 25px 0;">
               <h3 style="color: #8B4513; margin-top: 0; text-align: center; border-bottom: 2px solid #e0d6c8; padding-bottom: 10px;">🔐 Your Login Credentials</h3>
@@ -201,13 +209,9 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <p style="color: #555; margin-bottom: 15px;">Ready to get started? Access the MC Portal now:</p>
+              <p style="color: #555; margin-bottom: 15px;">Access the MC Portal:</p>
               <a href="https://prestige-bella-vista-2025-26-expensemgt.lovable.app" style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); color: #fff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Login to MC Portal</a>
             </div>
-            
-            <hr style="border: none; border-top: 1px solid #e0d6c8; margin: 30px 0;">
-            
-            <p style="color: #555; line-height: 1.6;">As a member of the Management Committee, you will have access to view reports, track society finances, and stay informed about community matters.</p>
             
             <p style="margin-top: 30px; color: #333;">
               Warm regards,<br>
@@ -224,8 +228,11 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Approval email sent:", emailResponse);
-
+    console.log("Approval email send result:", emailResponse);
+    if ((emailResponse as any)?.error) {
+      console.error("Resend approval email error:", (emailResponse as any).error);
+      throw new Error((emailResponse as any).error?.message || "Failed to send approval email");
+    }
     return new Response(
       JSON.stringify({
         success: true,

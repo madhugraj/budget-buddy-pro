@@ -106,12 +106,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Still navigate even if there's an error since we cleared local state
       }
 
-      // Always navigate to auth page after clearing state
-      navigate('/auth');
+      // Always navigate to landing page (Portal Access) after clearing state
+      navigate('/');
     } catch (error) {
       console.error('Unexpected sign out error:', error);
       // Navigate anyway since we've cleared the local state
-      navigate('/auth');
+      navigate('/');
     }
   };
 
