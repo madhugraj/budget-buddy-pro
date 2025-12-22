@@ -133,6 +133,45 @@ export type Database = {
         }
         Relationships: []
       }
+      cam_monthly_reports: {
+        Row: {
+          created_at: string
+          file_url: string
+          id: string
+          month: number
+          report_type: string
+          tower: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          file_url: string
+          id?: string
+          month: number
+          report_type: string
+          tower: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          file_url?: string
+          id?: string
+          month?: number
+          report_type?: string
+          tower?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+          year?: number
+        }
+        Relationships: []
+      }
       cam_tracking: {
         Row: {
           advance_payments: number
