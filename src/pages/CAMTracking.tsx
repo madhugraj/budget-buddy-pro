@@ -675,7 +675,7 @@ export default function CAMTracking() {
             file_url: fileName,
             uploaded_by: user.id,
           },
-          { onConflict: 'year,month,tower,report_type' }
+          { onConflict: 'tower,year,month,report_type' }
         );
 
       if (dbError) throw dbError;
@@ -715,245 +715,48 @@ export default function CAMTracking() {
   };
   if (loading) {
     return <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>;
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>;
   }
   return <div className="space-y-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Building2 className="h-6 w-6" />
-          CAM Tracking
-        </h1>
-        <p className="text-muted-foreground">
-          Track Common Area Maintenance payments by tower (Total: {TOTAL_FLATS_IN_COMPLEX} flats)
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Building2 className="h-6 w-6" />
+            CAM Tracking
+          </h1>
+          <p className="text-muted-foreground">
+            Track Common Area Maintenance payments by tower (Total: {TOTAL_FLATS_IN_COMPLEX} flats)
+          </p>
+        </div>
       </div>
-    </div>
 
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="tower-entry">Tower-wise Entry</TabsTrigger>
-        <TabsTrigger value="overview">All Towers Overview</TabsTrigger>
-        <TabsTrigger value="monthly-reports">Monthly Reports (30th/20th)</TabsTrigger>
-        <TabsTrigger value="discrepancies">
-          Discrepancy Check {discrepancyCount > 0 && `(${discrepancyCount})`}
-        </TabsTrigger>
-        <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
-        {userRole === 'lead' && <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>}
-      </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="tower-entry">Tower-wise Entry</TabsTrigger>
+          <TabsTrigger value="overview">All Towers Overview</TabsTrigger>
+          <TabsTrigger value="monthly-reports">Monthly Reports (30th/20th)</TabsTrigger>
+          <TabsTrigger value="discrepancies">
+            Discrepancy Check {discrepancyCount > 0 && `(${discrepancyCount})`}
+          </TabsTrigger>
+          <TabsTrigger value="summary">Quarterly Summary</TabsTrigger>
+          {userRole === 'lead' && <TabsTrigger value="drafts">Draft Records ({draftRecords.length})</TabsTrigger>}
+        </TabsList>
 
-      <TabsContent value="tower-entry" className="space-y-4">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <Select value={selectedTower} onValueChange={setSelectedTower}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select Tower" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
-                    Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
-                  </SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Quarter" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Tower {selectedTower} has <strong>{TOWER_TOTAL_FLATS[selectedTower]}</strong> total flats.
-                Paid + Pending cannot exceed this limit.
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-6">
-              {getCalendarYearAndMonths().months.map(month => <div key={month} className="p-4 border rounded-lg bg-muted/20">
-                <h3 className="font-semibold mb-3 text-primary">{MONTH_NAMES[month]}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Paid Flats</label>
-                    <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).paid_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'paid_flats', e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Pending Flats</label>
-                    <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).pending_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'pending_flats', e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Dues Cleared</label>
-                    <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).dues_cleared_from_previous || ''} onChange={e => handleInputChange(selectedTower, month, 'dues_cleared_from_previous', e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Advance</label>
-                    <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).advance_payments || ''} onChange={e => handleInputChange(selectedTower, month, 'advance_payments', e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">CAM Recon</label>
-                    <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).cam_recon_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'cam_recon_flats', e.target.value)} placeholder="0" />
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                      <FileText className="h-3 w-3" /> 20th Report (Without Recon)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const report = monthlyReports.find(
-                          (r) =>
-                            (r as any).tower === selectedTower &&
-                            r.month === month &&
-                            (r as any).report_type === 'defaulters_20th'
-                        );
-                        return report ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1"
-                            onClick={() => downloadReport(report)}
-                          >
-                            <Download className="h-3 w-3" /> Download
-                          </Button>
-                        ) : null;
-                      })()}
-                      <div className="relative">
-                        <input
-                          type="file"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          onChange={(e) => handleReportUpload(e, month, 'defaulters_20th', selectedTower)}
-                          disabled={saving}
-                        />
-                        <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
-                          <Upload className="h-3 w-3" />{' '}
-                          {monthlyReports.find(
-                            (r) =>
-                              (r as any).tower === selectedTower &&
-                              r.month === month &&
-                              (r as any).report_type === 'defaulters_20th'
-                          )
-                            ? 'Update 20th'
-                            : 'Upload 20th'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
-                      <FileText className="h-3 w-3" /> 30th Report (With Recon)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const report = monthlyReports.find(
-                          (r) =>
-                            (r as any).tower === selectedTower &&
-                            r.month === month &&
-                            (r as any).report_type === 'defaulters_30th'
-                        );
-                        return report ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1"
-                            onClick={() => downloadReport(report)}
-                          >
-                            <Download className="h-3 w-3" /> Download
-                          </Button>
-                        ) : null;
-                      })()}
-                      <div className="relative">
-                        <input
-                          type="file"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          onChange={(e) => handleReportUpload(e, month, 'defaulters_30th', selectedTower)}
-                          disabled={saving}
-                        />
-                        <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
-                          <Upload className="h-3 w-3" />{' '}
-                          {monthlyReports.find(
-                            (r) =>
-                              (r as any).tower === selectedTower &&
-                              r.month === month &&
-                              (r as any).report_type === 'defaulters_30th'
-                          )
-                            ? 'Update 30th'
-                            : 'Upload 30th'}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {validationErrors[`${selectedTower}-${month}`] && <p className="text-sm text-destructive mt-2">{validationErrors[`${selectedTower}-${month}`]}</p>}
-              </div>)}
-            </div>
-
-
-
-            <div className="flex items-center justify-between gap-3 pt-4 border-t">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <input type="file" accept=".xlsx,.xls,.csv" onChange={e => handleFileUpload(e, selectedTower)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={!canEditTower(selectedTower)} />
-                  <Button variant="outline" size="sm" disabled={!canEditTower(selectedTower)}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload
-                  </Button>
-                </div>
-
-                {supportingDocs[selectedTower] && <div className="flex items-center gap-2">
-                  <a href={supportingDocs[selectedTower]} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center">
-                    <Download className="h-3 w-3 mr-1" />
-                    View Document
-                  </a>
-                </div>}
-
-                <Button onClick={() => handleSaveTower(selectedTower)} disabled={saving || !!validationErrors[selectedTower] || !canEditTower(selectedTower)} variant="outline">
-                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  Save Draft
-                </Button>
-                {userRole === 'lead' && getTowerStatus(selectedTower) === 'draft' && <Button onClick={() => handleSubmitTower(selectedTower)} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                  Submit for Approval
-                </Button>}
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground mb-1">Status</p>
-                <Badge variant={getTowerStatus(selectedTower) === 'approved' ? 'default' : getTowerStatus(selectedTower) === 'submitted' ? 'secondary' : getTowerStatus(selectedTower) === 'correction_pending' ? 'destructive' : 'outline'}>
-                  {getTowerStatus(selectedTower) === 'draft' ? 'Draft' : getTowerStatus(selectedTower) === 'submitted' ? 'Pending Approval' : getTowerStatus(selectedTower) === 'approved' ? 'Approved' : getTowerStatus(selectedTower) === 'correction_pending' ? 'Correction Pending' : getTowerStatus(selectedTower) === 'correction_approved' ? 'Edit Allowed' : 'Draft'}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="overview" className="space-y-4">
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <CardTitle className="text-lg">All Towers - {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.label} {selectedYear}</CardTitle>
-              <div className="flex items-center gap-3">
-                {(userRole === 'treasurer' || userRole === 'lead') && <Button variant="outline" size="sm" onClick={handleDownload}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Report
-                </Button>}
+        <TabsContent value="tower-entry" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <Select value={selectedTower} onValueChange={setSelectedTower}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Tower" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
+                        Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
+                      </SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
                   <SelectTrigger className="w-[120px]">
                     <SelectValue placeholder="Year" />
@@ -971,116 +774,313 @@ export default function CAMTracking() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border overflow-auto max-h-[600px]">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead className="w-[80px]">Tower</TableHead>
-                    <TableHead className="w-[80px]">Total</TableHead>
-                    {getCalendarYearAndMonths().months.map(m => <TableHead key={m} className="text-center border-l" colSpan={2}>{MONTH_NAMES[m]}</TableHead>)}
-                  </TableRow>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead></TableHead>
-                    {getCalendarYearAndMonths().months.map(m => <>
-                      <TableHead key={`${m}-paid`} className="text-xs text-center border-l text-green-600">Paid</TableHead>
-                      <TableHead key={`${m}-pending`} className="text-xs text-center text-red-600">Pending</TableHead>
-                    </>)}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {TOWERS.map(tower => {
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Tower {selectedTower} has <strong>{TOWER_TOTAL_FLATS[selectedTower]}</strong> total flats.
+                  Paid + Pending cannot exceed this limit.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-6">
+                {getCalendarYearAndMonths().months.map(month => <div key={month} className="p-4 border rounded-lg bg-muted/20">
+                    <h3 className="font-semibold mb-3 text-primary">{MONTH_NAMES[month]}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Paid Flats</label>
+                        <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).paid_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'paid_flats', e.target.value)} placeholder="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Pending Flats</label>
+                        <Input type="number" min="0" max={TOWER_TOTAL_FLATS[selectedTower]} value={getTowerMonthData(selectedTower, month).pending_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'pending_flats', e.target.value)} placeholder="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Dues Cleared</label>
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).dues_cleared_from_previous || ''} onChange={e => handleInputChange(selectedTower, month, 'dues_cleared_from_previous', e.target.value)} placeholder="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Advance</label>
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).advance_payments || ''} onChange={e => handleInputChange(selectedTower, month, 'advance_payments', e.target.value)} placeholder="0" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">CAM Recon</label>
+                        <Input type="number" min="0" value={getTowerMonthData(selectedTower, month).cam_recon_flats || ''} onChange={e => handleInputChange(selectedTower, month, 'cam_recon_flats', e.target.value)} placeholder="0" />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-dashed grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                          <FileText className="h-3 w-3" /> 20th Report (Without Recon)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const report = monthlyReports.find(
+                              (r) =>
+                                (r as any).tower === selectedTower &&
+                                r.month === month &&
+                                (r as any).report_type === 'defaulters_20th'
+                            );
+                            return report ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                                onClick={() => downloadReport(report)}
+                              >
+                                <Download className="h-3 w-3" /> Download
+                              </Button>
+                            ) : null;
+                          })()}
+                          <div className="relative">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handleReportUpload(e, month, 'defaulters_20th', selectedTower)}
+                              disabled={saving}
+                            />
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
+                              <Upload className="h-3 w-3" />{' '}
+                              {monthlyReports.find(
+                                (r) =>
+                                  (r as any).tower === selectedTower &&
+                                  r.month === month &&
+                                  (r as any).report_type === 'defaulters_20th'
+                              )
+                                ? 'Update 20th'
+                                : 'Upload 20th'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                          <FileText className="h-3 w-3" /> 30th Report (With Recon)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const report = monthlyReports.find(
+                              (r) =>
+                                (r as any).tower === selectedTower &&
+                                r.month === month &&
+                                (r as any).report_type === 'defaulters_30th'
+                            );
+                            return report ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                                onClick={() => downloadReport(report)}
+                              >
+                                <Download className="h-3 w-3" /> Download
+                              </Button>
+                            ) : null;
+                          })()}
+                          <div className="relative">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handleReportUpload(e, month, 'defaulters_30th', selectedTower)}
+                              disabled={saving}
+                            />
+                            <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
+                              <Upload className="h-3 w-3" />{' '}
+                              {monthlyReports.find(
+                                (r) =>
+                                  (r as any).tower === selectedTower &&
+                                  r.month === month &&
+                                  (r as any).report_type === 'defaulters_30th'
+                              )
+                                ? 'Update 30th'
+                                : 'Upload 30th'}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {validationErrors[`${selectedTower}-${month}`] && <p className="text-sm text-destructive mt-2">{validationErrors[`${selectedTower}-${month}`]}</p>}
+                  </div>)}
+              </div>
+
+
+
+              <div className="flex items-center justify-between gap-3 pt-4 border-t">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <input type="file" accept=".xlsx,.xls,.csv" onChange={e => handleFileUpload(e, selectedTower)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={!canEditTower(selectedTower)} />
+                    <Button variant="outline" size="sm" disabled={!canEditTower(selectedTower)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload
+                    </Button>
+                  </div>
+
+                  {supportingDocs[selectedTower] && <div className="flex items-center gap-2">
+                      <a href={supportingDocs[selectedTower]} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center">
+                        <Download className="h-3 w-3 mr-1" />
+                        View Document
+                      </a>
+                    </div>}
+
+                  <Button onClick={() => handleSaveTower(selectedTower)} disabled={saving || !!validationErrors[selectedTower] || !canEditTower(selectedTower)} variant="outline">
+                    {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save Draft
+                  </Button>
+                  {userRole === 'lead' && getTowerStatus(selectedTower) === 'draft' && <Button onClick={() => handleSubmitTower(selectedTower)} disabled={saving}>
+                      {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      Submit for Approval
+                    </Button>}
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <Badge variant={getTowerStatus(selectedTower) === 'approved' ? 'default' : getTowerStatus(selectedTower) === 'submitted' ? 'secondary' : getTowerStatus(selectedTower) === 'correction_pending' ? 'destructive' : 'outline'}>
+                    {getTowerStatus(selectedTower) === 'draft' ? 'Draft' : getTowerStatus(selectedTower) === 'submitted' ? 'Pending Approval' : getTowerStatus(selectedTower) === 'approved' ? 'Approved' : getTowerStatus(selectedTower) === 'correction_pending' ? 'Correction Pending' : getTowerStatus(selectedTower) === 'correction_approved' ? 'Edit Allowed' : 'Draft'}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <CardTitle className="text-lg">All Towers - {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.label} {selectedYear}</CardTitle>
+                <div className="flex items-center gap-3">
+                  {(userRole === 'treasurer' || userRole === 'lead') && <Button variant="outline" size="sm" onClick={handleDownload}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Report
+                    </Button>}
+                  <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-auto max-h-[600px]">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="w-[80px]">Tower</TableHead>
+                      <TableHead className="w-[80px]">Total</TableHead>
+                      {getCalendarYearAndMonths().months.map(m => <TableHead key={m} className="text-center border-l" colSpan={2}>{MONTH_NAMES[m]}</TableHead>)}
+                    </TableRow>
+                    <TableRow>
+                      <TableHead></TableHead>
+                      <TableHead></TableHead>
+                      {getCalendarYearAndMonths().months.map(m => <>
+                          <TableHead key={`${m}-paid`} className="text-xs text-center border-l text-green-600">Paid</TableHead>
+                          <TableHead key={`${m}-pending`} className="text-xs text-center text-red-600">Pending</TableHead>
+                        </>)}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {TOWERS.map(tower => {
                     const maxFlats = TOWER_TOTAL_FLATS[tower];
                     const months = getCalendarYearAndMonths().months;
                     return <TableRow key={tower}>
-                      <TableCell className="font-medium">{tower}</TableCell>
-                      <TableCell>{maxFlats}</TableCell>
-                      {months.map(m => {
+                          <TableCell className="font-medium">{tower}</TableCell>
+                          <TableCell>{maxFlats}</TableCell>
+                          {months.map(m => {
                         const data = getTowerMonthData(tower, m);
                         return <>
-                          <TableCell className="text-center border-l text-green-600">{data.paid_flats}</TableCell>
-                          <TableCell className="text-center text-red-600">{data.pending_flats}</TableCell>
-                        </>;
+                                <TableCell className="text-center border-l text-green-600">{data.paid_flats}</TableCell>
+                                <TableCell className="text-center text-red-600">{data.pending_flats}</TableCell>
+                              </>;
                       })}
-                    </TableRow>;
+                        </TableRow>;
                   })}
-                  <TableRow className="bg-muted/50 font-semibold">
-                    <TableCell>Total</TableCell>
-                    <TableCell>{TOTAL_FLATS_IN_COMPLEX}</TableCell>
-                    {getCalendarYearAndMonths().months.map(m => {
+                    <TableRow className="bg-muted/50 font-semibold">
+                      <TableCell>Total</TableCell>
+                      <TableCell>{TOTAL_FLATS_IN_COMPLEX}</TableCell>
+                      {getCalendarYearAndMonths().months.map(m => {
                       const totalPaid = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.paid_flats || 0), 0);
                       const totalPending = Object.values(camData).reduce((sum, tData) => sum + (tData[m]?.pending_flats || 0), 0);
                       return <>
-                        <TableCell className="text-center border-l text-green-600">{totalPaid}</TableCell>
-                        <TableCell className="text-center text-red-600">{totalPending}</TableCell>
-                      </>;
+                            <TableCell className="text-center border-l text-green-600">{totalPaid}</TableCell>
+                            <TableCell className="text-center text-red-600">{totalPending}</TableCell>
+                          </>;
                     })}
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="discrepancies" className="space-y-4">
-        <DiscrepancyReport />
-      </TabsContent>
-
-      <TabsContent value="summary">
-        <QuarterlySummary />
-      </TabsContent>
-
-      {userRole === 'lead' && <TabsContent value="drafts">
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>Draft CAM Records</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Select records to submit for approval
-                </p>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </div>
-              {selectedDrafts.size > 0 && <Button onClick={handleBulkSubmit} disabled={saving}>
-                <Send className="w-4 h-4 mr-2" />
-                Submit {selectedDrafts.size} Record{selectedDrafts.size > 1 ? 's' : ''}
-              </Button>}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingDrafts ? <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div> : draftRecords.length === 0 ? <p className="text-center py-8 text-muted-foreground">
-              No draft records found. All data has been submitted.
-            </p> : <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox checked={selectedDrafts.size === draftRecords.length && draftRecords.length > 0} onCheckedChange={checked => {
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="discrepancies" className="space-y-4">
+          <DiscrepancyReport />
+        </TabsContent>
+
+        <TabsContent value="summary">
+          <QuarterlySummary />
+        </TabsContent>
+
+        {userRole === 'lead' && <TabsContent value="drafts">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Draft CAM Records</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select records to submit for approval
+                    </p>
+                  </div>
+                  {selectedDrafts.size > 0 && <Button onClick={handleBulkSubmit} disabled={saving}>
+                      <Send className="w-4 h-4 mr-2" />
+                      Submit {selectedDrafts.size} Record{selectedDrafts.size > 1 ? 's' : ''}
+                    </Button>}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingDrafts ? <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div> : draftRecords.length === 0 ? <p className="text-center py-8 text-muted-foreground">
+                    No draft records found. All data has been submitted.
+                  </p> : <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <Checkbox checked={selectedDrafts.size === draftRecords.length && draftRecords.length > 0} onCheckedChange={checked => {
                         if (checked) {
                           setSelectedDrafts(new Set(draftRecords.map(r => r.id)));
                         } else {
                           setSelectedDrafts(new Set());
                         }
                       }} />
-                    </TableHead>
-                    <TableHead>Tower</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead className="text-right">Paid Flats</TableHead>
-                    <TableHead className="text-right">Pending Flats</TableHead>
-                    <TableHead className="text-right">Total Flats</TableHead>
-                    <TableHead className="text-right">Dues Cleared</TableHead>
-                    <TableHead className="text-right">Advance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {draftRecords.map(record => <TableRow key={record.id}>
-                    <TableCell>
-                      <Checkbox checked={selectedDrafts.has(record.id)} onCheckedChange={checked => {
+                          </TableHead>
+                          <TableHead>Tower</TableHead>
+                          <TableHead>Month</TableHead>
+                          <TableHead className="text-right">Paid Flats</TableHead>
+                          <TableHead className="text-right">Pending Flats</TableHead>
+                          <TableHead className="text-right">Total Flats</TableHead>
+                          <TableHead className="text-right">Dues Cleared</TableHead>
+                          <TableHead className="text-right">Advance</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {draftRecords.map(record => <TableRow key={record.id}>
+                            <TableCell>
+                              <Checkbox checked={selectedDrafts.has(record.id)} onCheckedChange={checked => {
                         const newSelected = new Set(selectedDrafts);
                         if (checked) {
                           newSelected.add(record.id);
@@ -1089,75 +1089,75 @@ export default function CAMTracking() {
                         }
                         setSelectedDrafts(newSelected);
                       }} />
-                    </TableCell>
-                    <TableCell className="font-medium">{record.tower}</TableCell>
-                    <TableCell>
-                      {MONTH_NAMES[record.month || 0] || record.month}
-                    </TableCell>
-                    <TableCell className="text-right">{record.paid_flats}</TableCell>
-                    <TableCell className="text-right">{record.pending_flats}</TableCell>
-                    <TableCell className="text-right">{record.total_flats}</TableCell>
-                    <TableCell className="text-right">{record.dues_cleared_from_previous}</TableCell>
-                    <TableCell className="text-right">{record.advance_payments}</TableCell>
-                  </TableRow>)}
-                </TableBody>
-              </Table>
-            </div>}
-          </CardContent>
-        </Card>
-      </TabsContent>}
+                            </TableCell>
+                            <TableCell className="font-medium">{record.tower}</TableCell>
+                            <TableCell>
+                              {MONTH_NAMES[record.month || 0] || record.month}
+                            </TableCell>
+                            <TableCell className="text-right">{record.paid_flats}</TableCell>
+                            <TableCell className="text-right">{record.pending_flats}</TableCell>
+                            <TableCell className="text-right">{record.total_flats}</TableCell>
+                            <TableCell className="text-right">{record.dues_cleared_from_previous}</TableCell>
+                            <TableCell className="text-right">{record.advance_payments}</TableCell>
+                          </TableRow>)}
+                      </TableBody>
+                    </Table>
+                  </div>}
+              </CardContent>
+            </Card>
+          </TabsContent>}
 
-      <TabsContent value="monthly-reports">
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Defaulters & Recon Lists</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="flex flex-wrap items-center gap-4 mb-4">
-                <Select value={selectedTower} onValueChange={setSelectedTower}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select Tower" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
-                      Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
-                    </SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue placeholder="Quarter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="text-sm text-muted-foreground">
-
+        <TabsContent value="monthly-reports">
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Defaulters & Recon Lists</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-4 mb-4">
+                  <Select value={selectedTower} onValueChange={setSelectedTower}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Select Tower" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TOWERS.map(tower => <SelectItem key={tower} value={tower}>
+                          Tower {tower} ({TOWER_TOTAL_FLATS[tower]} flats)
+                        </SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(selectedQuarter)} onValueChange={v => setSelectedQuarter(Number(v))}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Quarter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FISCAL_QUARTERS.map(q => <SelectItem key={q.value} value={String(q.value)}>{q.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-sm text-muted-foreground">
+                    
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Month</TableHead>
-                      <TableHead>Tower</TableHead>
-                      <TableHead>20th (Without Recon)</TableHead>
-                      <TableHead>30th (With Recon)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.months.slice().reverse().map(month => {
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Tower</TableHead>
+                        <TableHead>20th (Without Recon)</TableHead>
+                        <TableHead>30th (With Recon)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.months.slice().reverse().map(month => {
                       const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
 
                       // Show reports for the currently selected tower in this tab too
@@ -1176,49 +1176,49 @@ export default function CAMTracking() {
                           r.report_type === 'defaulters_30th'
                       );
                       return <TableRow key={month}>
-                        <TableCell className="font-medium text-xs">{MONTH_NAMES[month]} {mYear}</TableCell>
-                        <TableCell className="text-xs font-bold">Tower {selectedTower}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {defaulterReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(defaulterReport)}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
-                            {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
-                              <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_20th', selectedTower)} />
-                              <Button variant="outline" size="sm">
-                                <Upload className="h-3 w-3 mr-1" />
-                                {defaulterReport ? 'Update' : 'Upload'}
-                              </Button>
-                            </div>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {reconReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(reconReport)}>
-                              <Download className="h-4 w-4 mr-2" />
-                              Download
-                            </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
-                            {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
-                              <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_30th', selectedTower)} />
-                              <Button variant="outline" size="sm">
-                                <Upload className="h-3 w-3 mr-1" />
-                                {reconReport ? 'Update' : 'Upload'}
-                              </Button>
-                            </div>}
-                          </div>
-                        </TableCell>
-                      </TableRow>;
+                            <TableCell className="font-medium text-xs">{MONTH_NAMES[month]} {mYear}</TableCell>
+                            <TableCell className="text-xs font-bold">Tower {selectedTower}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {defaulterReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(defaulterReport)}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_20th', selectedTower)} />
+                                    <Button variant="outline" size="sm">
+                                      <Upload className="h-3 w-3 mr-1" />
+                                      {defaulterReport ? 'Update' : 'Upload'}
+                                    </Button>
+                                  </div>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {reconReport ? <Button variant="ghost" size="sm" onClick={() => downloadReport(reconReport)}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
+                                {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_30th', selectedTower)} />
+                                    <Button variant="outline" size="sm">
+                                      <Upload className="h-3 w-3 mr-1" />
+                                      {reconReport ? 'Update' : 'Upload'}
+                                    </Button>
+                                  </div>}
+                              </div>
+                            </TableCell>
+                          </TableRow>;
                     })}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
-  </div>;
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>;
 }
 function QuarterlySummary() {
   const [loading, setLoading] = useState(true);
@@ -1284,79 +1284,79 @@ function QuarterlySummary() {
   };
   if (loading) {
     return <div className="flex items-center justify-center min-h-[200px]">
-      <Loader2 className="h-6 w-6 animate-spin text-primary" />
-    </div>;
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>;
   }
   return <div className="space-y-4">
-    <div className="flex items-center gap-3">
-      <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
-        <SelectTrigger className="w-[120px]">
-          <SelectValue placeholder="Year" />
-        </SelectTrigger>
-        <SelectContent>
-          {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
-        </SelectContent>
-      </Select>
-    </div>
+      <div className="flex items-center gap-3">
+        <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent>
+            {years.map(year => <SelectItem key={year} value={String(year)}>FY {year}-{year + 1}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
 
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {FISCAL_QUARTERS.map(q => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {FISCAL_QUARTERS.map(q => {
         const totals = getQuarterTotals(q.value);
         return <Card key={q.value}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{q.label}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Total Demand (3 months):</span>
-              <span className="font-medium">{totals.total}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Paid:</span>
-              <span className="font-medium text-green-600">{totals.paid}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Pending:</span>
-              <span className="font-medium text-red-600">{totals.pending}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Dues Cleared:</span>
-              <span className="font-medium text-blue-600">{totals.duesCleared}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Advance Paid:</span>
-              <span className="font-medium text-purple-600">{totals.advance}</span>
-            </div>
-            {totals.paid > 0 && <div className="pt-2 border-t">
-              <div className="text-xs text-muted-foreground">Collection Rate</div>
-              <div className="text-lg font-bold">
-                {(totals.paid / totals.total * 100).toFixed(1)}%
-              </div>
-            </div>}
-          </CardContent>
-        </Card>;
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">{q.label}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Demand (3 months):</span>
+                  <span className="font-medium">{totals.total}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Paid:</span>
+                  <span className="font-medium text-green-600">{totals.paid}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Pending:</span>
+                  <span className="font-medium text-red-600">{totals.pending}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Dues Cleared:</span>
+                  <span className="font-medium text-blue-600">{totals.duesCleared}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Advance Paid:</span>
+                  <span className="font-medium text-purple-600">{totals.advance}</span>
+                </div>
+                {totals.paid > 0 && <div className="pt-2 border-t">
+                    <div className="text-xs text-muted-foreground">Collection Rate</div>
+                    <div className="text-lg font-bold">
+                      {(totals.paid / totals.total * 100).toFixed(1)}%
+                    </div>
+                  </div>}
+              </CardContent>
+            </Card>;
       })}
-    </div>
+      </div>
 
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Tower-wise Quarterly Comparison - Pending Flats</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-md border overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tower</TableHead>
-                <TableHead className="text-center">Total Flats</TableHead>
-                {FISCAL_QUARTERS.map(q => <TableHead key={q.value} className="text-center">{q.label}</TableHead>)}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {TOWERS.map(tower => <TableRow key={tower}>
-                <TableCell className="font-medium">{tower}</TableCell>
-                <TableCell className="text-center">{TOWER_TOTAL_FLATS[tower]}</TableCell>
-                {FISCAL_QUARTERS.map(q => {
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Tower-wise Quarterly Comparison - Pending Flats</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tower</TableHead>
+                  <TableHead className="text-center">Total Flats</TableHead>
+                  {FISCAL_QUARTERS.map(q => <TableHead key={q.value} className="text-center">{q.label}</TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {TOWERS.map(tower => <TableRow key={tower}>
+                    <TableCell className="font-medium">{tower}</TableCell>
+                    <TableCell className="text-center">{TOWER_TOTAL_FLATS[tower]}</TableCell>
+                    {FISCAL_QUARTERS.map(q => {
                   const qMonths = q.months;
                   const towerData = summaryData.filter(d => d.tower === tower && qMonths.includes(d.month || 0));
 
@@ -1369,18 +1369,18 @@ function QuarterlySummary() {
                   // Use pending flats from the latest record, or 0 if no data
                   const totalPending = latestRecord ? latestRecord.pending_flats : 0;
                   return <TableCell key={q.value} className="text-center">
-                    <span className={totalPending > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                      {totalPending}
-                    </span>
-                  </TableCell>;
+                          <span className={totalPending > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                            {totalPending}
+                          </span>
+                        </TableCell>;
                 })}
-              </TableRow>)}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  </div>;
+                  </TableRow>)}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>;
 }
 function DiscrepancyReport() {
   const {
@@ -1494,55 +1494,55 @@ function DiscrepancyReport() {
   };
   if (loading || authLoading) return <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
   return <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-amber-600">
-        <AlertCircle className="h-5 w-5" />
-        Data Discrepancy Report
-      </CardTitle>
-      <p className="text-muted-foreground">
-        Identify potential data entry errors. Pending counts should typically decrease or stay same within a quarter.
-      </p>
-    </CardHeader>
-    <CardContent>
-      {discrepancies.length === 0 ? <div className="text-center py-8 text-green-600 flex flex-col items-center">
-        <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
-          <span className="text-xl">✓</span>
-        </div>
-        <p>No logical discrepancies found in pending counts.</p>
-      </div> : <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tower</TableHead>
-              <TableHead>Quarter</TableHead>
-              <TableHead>Issue</TableHead>
-              <TableHead>Details</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {discrepancies.map((item, idx) => <TableRow key={idx}>
-              <TableCell className="font-medium">{item.tower}</TableCell>
-              <TableCell>{item.quarter}</TableCell>
-              <TableCell>
-                <Badge variant="destructive" className="bg-amber-600 hover:bg-amber-700">
-                  {item.type}
-                </Badge>
-              </TableCell>
-              <TableCell>{item.description}</TableCell>
-              <TableCell className="text-right">
-                {userRole === 'treasurer' ? <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
-                  <Send className="h-4 w-4 mr-1" />
-                  Alert Lead
-                </Button> : userRole === 'lead' ? <Button size="sm" variant="outline" onClick={() => navigateToCorrectEntry(item)}>
-                  <FileText className="h-4 w-4 mr-1" />
-                  Correct Entry
-                </Button> : null}
-              </TableCell>
-            </TableRow>)}
-          </TableBody>
-        </Table>
-      </div>}
-    </CardContent>
-  </Card>;
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-amber-600">
+          <AlertCircle className="h-5 w-5" />
+          Data Discrepancy Report
+        </CardTitle>
+        <p className="text-muted-foreground">
+          Identify potential data entry errors. Pending counts should typically decrease or stay same within a quarter.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {discrepancies.length === 0 ? <div className="text-center py-8 text-green-600 flex flex-col items-center">
+            <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
+              <span className="text-xl">✓</span>
+            </div>
+            <p>No logical discrepancies found in pending counts.</p>
+          </div> : <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tower</TableHead>
+                  <TableHead>Quarter</TableHead>
+                  <TableHead>Issue</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {discrepancies.map((item, idx) => <TableRow key={idx}>
+                    <TableCell className="font-medium">{item.tower}</TableCell>
+                    <TableCell>{item.quarter}</TableCell>
+                    <TableCell>
+                      <Badge variant="destructive" className="bg-amber-600 hover:bg-amber-700">
+                        {item.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{item.description}</TableCell>
+                    <TableCell className="text-right">
+                      {userRole === 'treasurer' ? <Button size="sm" variant="outline" onClick={() => sendAlert(item)} disabled={sendingAlert}>
+                          <Send className="h-4 w-4 mr-1" />
+                          Alert Lead
+                        </Button> : userRole === 'lead' ? <Button size="sm" variant="outline" onClick={() => navigateToCorrectEntry(item)}>
+                          <FileText className="h-4 w-4 mr-1" />
+                          Correct Entry
+                        </Button> : null}
+                    </TableCell>
+                  </TableRow>)}
+              </TableBody>
+            </Table>
+          </div>}
+      </CardContent>
+    </Card>;
 }

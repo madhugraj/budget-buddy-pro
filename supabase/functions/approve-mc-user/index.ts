@@ -127,15 +127,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       if ((rejectionEmail as any)?.error) {
         console.error("Resend rejection email error:", JSON.stringify((rejectionEmail as any).error, null, 2));
-        // Don't throw error, just return with warning
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: "MC user rejected, but email notification failed.",
-            warning: "Email delivery failed: " + ((rejectionEmail as any).error?.message || "Unknown error")
-          }),
-          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+        throw new Error((rejectionEmail as any).error?.message || "Failed to send rejection email");
       }
 
       return new Response(
@@ -241,16 +233,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if ((emailResponse as any)?.error) {
       console.error("Resend approval email error:", JSON.stringify((emailResponse as any).error, null, 2));
-      // Don't throw error, just return with warning
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "MC user approved, but email notification failed.",
-          username: finalUsername,
-          warning: "Email delivery failed: " + ((emailResponse as any).error?.message || "Unknown error")
-        }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      throw new Error((emailResponse as any).error?.message || "Failed to send approval email");
     }
     return new Response(
       JSON.stringify({
