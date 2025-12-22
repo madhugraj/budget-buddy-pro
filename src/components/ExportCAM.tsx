@@ -77,6 +77,7 @@ export function ExportCAM() {
   const initialFiscal = getCurrentFiscal();
   const [selectedYear, setSelectedYear] = useState(initialFiscal.year);
   const [selectedQuarter, setSelectedQuarter] = useState(initialFiscal.quarter);
+  const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all' or month number as string
   const [camData, setCamData] = useState<CAMRecord[]>([]);
   const [mcUser, setMcUser] = useState<any>(null);
   const [monthlyReports, setMonthlyReports] = useState<any[]>([]);
@@ -93,7 +94,7 @@ export function ExportCAM() {
     }
     fetchCAMData();
     fetchMonthlyReports();
-  }, [selectedYear, selectedQuarter]);
+  }, [selectedYear, selectedQuarter, selectedMonth]);
 
   const fetchCAMData = async () => {
     setLoading(true);
@@ -119,13 +120,17 @@ export function ExportCAM() {
   const fetchMonthlyReports = async () => {
     try {
       const quarterConfig = FISCAL_QUARTERS.find(q => q.value === selectedQuarter);
-      const months = quarterConfig?.months || [];
+      // Determine which months to fetch
+      let targetMonths = quarterConfig?.months || [];
+      if (selectedMonth !== 'all') {
+        targetMonths = [parseInt(selectedMonth)];
+      }
 
       let query = (supabase as any)
         .from('cam_monthly_reports')
         .select('*')
         .eq('year', selectedYear)
-        .in('month', months);
+        .in('month', targetMonths);
 
       if (mcUser) {
         query = query.eq('tower', mcUser.tower_no);
@@ -406,6 +411,21 @@ export function ExportCAM() {
               </Select>
             </div>
 
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Month</label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="All Months" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Months</SelectItem>
+                  {FISCAL_QUARTERS.find(q => q.value === selectedQuarter)?.months.map(m => (
+                    <SelectItem key={m} value={m.toString()}>{MONTH_NAMES[m]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {mcUser && (
               <Badge variant="outline" className="ml-auto bg-primary/5 text-primary border-primary/20 h-9 px-3">
                 <Building2 className="mr-1.5 h-3.5 w-3.5" />
@@ -491,57 +511,57 @@ export function ExportCAM() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-medium text-muted-foreground">20th Report (Without Recon)</p>
-                        <div className="flex gap-1">
-                          {report.defaulters_list_url ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="h-7 w-7 p-0 flex-shrink-0"
-                              onClick={() => downloadReport(report.defaulters_list_url)}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
-                          ) : null}
-                          <div className="relative flex-1">
-                            <input
-                              type="file"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_20th')}
-                              disabled={saving}
-                            />
-                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                              <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
-                            </Button>
-                          </div>
+                      <div className="flex gap-1">
+                        {report.defaulters_list_url ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 w-7 p-0 flex-shrink-0"
+                            onClick={() => downloadReport(report.defaulters_list_url)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_20th')}
+                            disabled={saving}
+                          />
+                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                            <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
+                          </Button>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-1.5">
-                        <p className="text-[10px] font-medium text-muted-foreground">30th Report (With Recon)</p>
-                        <div className="flex gap-1">
-                          {report.recon_list_url ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="h-7 w-7 p-0 flex-shrink-0"
-                              onClick={() => downloadReport(report.recon_list_url)}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
-                          ) : null}
-                          <div className="relative flex-1">
-                            <input
-                              type="file"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_30th')}
-                              disabled={saving}
-                            />
-                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                              <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
-                            </Button>
-                          </div>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-medium text-muted-foreground">30th Report (With Recon)</p>
+                      <div className="flex gap-1">
+                        {report.recon_list_url ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-7 w-7 p-0 flex-shrink-0"
+                            onClick={() => downloadReport(report.recon_list_url)}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : null}
+                        <div className="relative flex-1">
+                          <input
+                            type="file"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_30th')}
+                            disabled={saving}
+                          />
+                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                            <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
+                          </Button>
                         </div>
                       </div>
+                    </div>
                   </div>
                 </div>
               ))}
