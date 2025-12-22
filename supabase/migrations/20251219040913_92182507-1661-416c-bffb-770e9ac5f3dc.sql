@@ -53,7 +53,9 @@ DO $$ BEGIN
 END $$;
 
 -- RPC: verify_mc_login
+DROP FUNCTION IF EXISTS public.verify_mc_login(text, text);
 CREATE OR REPLACE FUNCTION public.verify_mc_login(
+
   p_username text,
   p_password text
 )
@@ -93,7 +95,9 @@ END;
 $$;
 
 -- RPC: update_mc_password
+DROP FUNCTION IF EXISTS public.update_mc_password(text, text, text);
 CREATE OR REPLACE FUNCTION public.update_mc_password(
+
   p_username text,
   p_old_password text,
   p_new_password text

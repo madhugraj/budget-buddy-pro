@@ -1,5 +1,5 @@
--- Create petty_cash table
-CREATE TABLE public.petty_cash (
+-- Create petty_cash table if not exists
+CREATE TABLE IF NOT EXISTS public.petty_cash (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   item_name TEXT NOT NULL,
   description TEXT,
@@ -13,37 +13,55 @@ CREATE TABLE public.petty_cash (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Add foreign key constraints
-ALTER TABLE public.petty_cash
-  ADD CONSTRAINT petty_cash_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES public.profiles(id),
-  ADD CONSTRAINT petty_cash_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.profiles(id);
+-- Add foreign key constraints if not exists
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'petty_cash_submitted_by_fkey') THEN
+    ALTER TABLE public.petty_cash ADD CONSTRAINT petty_cash_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES public.profiles(id);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'petty_cash_approved_by_fkey') THEN
+    ALTER TABLE public.petty_cash ADD CONSTRAINT petty_cash_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.profiles(id);
+  END IF;
+END $$;
 
 -- Enable RLS
 ALTER TABLE public.petty_cash ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
--- Anyone authenticated can view petty cash entries
-CREATE POLICY "Authenticated users can view petty cash"
-  ON public.petty_cash FOR SELECT
-  USING (auth.uid() IS NOT NULL);
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'petty_cash' AND policyname = 'Authenticated users can view petty cash') THEN
+        CREATE POLICY "Authenticated users can view petty cash"
+          ON public.petty_cash FOR SELECT
+          USING (auth.uid() IS NOT NULL);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'petty_cash' AND policyname = 'Users can insert petty cash') THEN
+        CREATE POLICY "Users can insert petty cash"
+          ON public.petty_cash FOR INSERT
+          WITH CHECK (auth.uid() = submitted_by);
+    END IF;
 
--- Leads, accountants, and treasurers can insert petty cash
-CREATE POLICY "Users can insert petty cash"
-  ON public.petty_cash FOR INSERT
-  WITH CHECK (auth.uid() = submitted_by);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'petty_cash' AND policyname = 'Users can update own pending petty cash') THEN
+        CREATE POLICY "Users can update own pending petty cash"
+          ON public.petty_cash FOR UPDATE
+          USING ((auth.uid() = submitted_by AND status = 'pending') OR has_role(auth.uid(), 'treasurer'::user_role));
+    END IF;
 
--- Users can update their own pending entries, treasurers can update any
-CREATE POLICY "Users can update own pending petty cash"
-  ON public.petty_cash FOR UPDATE
-  USING ((auth.uid() = submitted_by AND status = 'pending') OR has_role(auth.uid(), 'treasurer'::user_role));
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'petty_cash' AND policyname = 'Treasurers can delete petty cash') THEN
+        CREATE POLICY "Treasurers can delete petty cash"
+          ON public.petty_cash FOR DELETE
+          USING (has_role(auth.uid(), 'treasurer'::user_role));
+    END IF;
+END $$;
 
--- Treasurers can delete petty cash entries
-CREATE POLICY "Treasurers can delete petty cash"
-  ON public.petty_cash FOR DELETE
-  USING (has_role(auth.uid(), 'treasurer'::user_role));
-
--- Create trigger for updated_at
-CREATE TRIGGER update_petty_cash_updated_at
-  BEFORE UPDATE ON public.petty_cash
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_updated_at();
+-- Create trigger for updated_at if not exists
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_petty_cash_updated_at') THEN
+    CREATE TRIGGER update_petty_cash_updated_at
+      BEFORE UPDATE ON public.petty_cash
+      FOR EACH ROW
+      EXECUTE FUNCTION public.handle_updated_at();
+  END IF;
+END $$;
