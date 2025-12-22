@@ -123,13 +123,15 @@ interface CAMDataFromDB {
   document_url?: string | null;
 }
 
+type MonthlyReportType = 'defaulters_20th' | 'defaulters_30th';
+
 interface MonthlyReport {
   id: string;
   year: number;
   month: number;
   tower: string;
-  report_type: 'defaulters_list' | 'recon_list';
-  document_url: string;
+  report_type: MonthlyReportType;
+  file_url: string;
   uploaded_at: string;
   uploaded_by: string;
   status?: string | null;
@@ -639,34 +641,50 @@ export default function CAMTracking() {
       setLoadingReports(false);
     }
   };
-  const handleReportUpload = async (event: React.ChangeEvent<HTMLInputElement>, month: number, type: 'defaulters_list' | 'recon_list', tower?: string) => {
+  const handleReportUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    month: number,
+    type: MonthlyReportType,
+    tower?: string
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
+
     const targetTower = tower || selectedTower;
+
     try {
       setSaving(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `monthly_reports/${selectedYear}/${targetTower}/${month}/${type}_${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('cam').upload(fileName, file, {
-        upsert: true
-      });
+
+      // IMPORTANT: storage policy expects the first folder to be "monthly-reports"
+      const fileName = `monthly-reports/${selectedYear}/${targetTower}/${month}/${type}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('cam')
+        .upload(fileName, file, { upsert: true });
       if (uploadError) throw uploadError;
 
       const { error: dbError } = await (supabase as any)
         .from('cam_monthly_reports')
-        .upsert({
-          year: selectedYear,
-          month: month,
-          tower: targetTower,
-          report_type: type,
-          document_url: fileName,
-          uploaded_by: user.id
-        }, {
-          onConflict: 'year,month,tower,report_type'
-        });
+        .upsert(
+          {
+            year: selectedYear,
+            month,
+            tower: targetTower,
+            report_type: type,
+            file_url: fileName,
+            uploaded_by: user.id,
+          },
+          { onConflict: 'tower,year,month,report_type' }
+        );
 
       if (dbError) throw dbError;
-      const reportLabel = type === 'defaulters_list' ? '20th Report (Without Recon)' : '30th Report (With Recon)';
+
+      const reportLabel =
+        type === 'defaulters_20th'
+          ? '20th Report (Without Recon)'
+          : '30th Report (With Recon)';
+
       toast.success(`${reportLabel} uploaded for ${targetTower} - ${MONTH_NAMES[month]}`);
       fetchMonthlyReports();
     } catch (error: any) {
@@ -676,13 +694,14 @@ export default function CAMTracking() {
       event.target.value = '';
     }
   };
+
   const downloadReport = async (report: MonthlyReport) => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.storage.from('cam').createSignedUrl(report.document_url, 3600);
+      const { data, error } = await supabase.storage
+        .from('cam')
+        .createSignedUrl(report.file_url, 3600);
       if (error) throw error;
+
       const link = document.createElement('a');
       link.href = data.signedUrl;
       link.download = `${report.report_type}_${MONTH_NAMES[report.month]}_${report.year}`;
@@ -798,15 +817,40 @@ export default function CAMTracking() {
                         </label>
                         <div className="flex items-center gap-2">
                           {(() => {
-                        const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'defaulters_list');
-                        return report ? <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
+                            const report = monthlyReports.find(
+                              (r) =>
+                                (r as any).tower === selectedTower &&
+                                r.month === month &&
+                                (r as any).report_type === 'defaulters_20th'
+                            );
+                            return report ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                                onClick={() => downloadReport(report)}
+                              >
                                 <Download className="h-3 w-3" /> Download
-                              </Button> : null;
-                      })()}
+                              </Button>
+                            ) : null;
+                          })()}
                           <div className="relative">
-                            <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_list', selectedTower)} disabled={saving} />
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handleReportUpload(e, month, 'defaulters_20th', selectedTower)}
+                              disabled={saving}
+                            />
                             <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
-                              <Upload className="h-3 w-3" /> {monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'defaulters_list') ? 'Update 20th' : 'Upload 20th'}
+                              <Upload className="h-3 w-3" />{' '}
+                              {monthlyReports.find(
+                                (r) =>
+                                  (r as any).tower === selectedTower &&
+                                  r.month === month &&
+                                  (r as any).report_type === 'defaulters_20th'
+                              )
+                                ? 'Update 20th'
+                                : 'Upload 20th'}
                             </Button>
                           </div>
                         </div>
@@ -818,15 +862,40 @@ export default function CAMTracking() {
                         </label>
                         <div className="flex items-center gap-2">
                           {(() => {
-                        const report = monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'recon_list');
-                        return report ? <Button variant="outline" size="sm" className="h-8 gap-1" onClick={() => downloadReport(report)}>
+                            const report = monthlyReports.find(
+                              (r) =>
+                                (r as any).tower === selectedTower &&
+                                r.month === month &&
+                                (r as any).report_type === 'defaulters_30th'
+                            );
+                            return report ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1"
+                                onClick={() => downloadReport(report)}
+                              >
                                 <Download className="h-3 w-3" /> Download
-                              </Button> : null;
-                      })()}
+                              </Button>
+                            ) : null;
+                          })()}
                           <div className="relative">
-                            <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'recon_list', selectedTower)} disabled={saving} />
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => handleReportUpload(e, month, 'defaulters_30th', selectedTower)}
+                              disabled={saving}
+                            />
                             <Button variant="ghost" size="sm" className="h-8 text-[10px] gap-1">
-                              <Upload className="h-3 w-3" /> {monthlyReports.find(r => (r as any).tower === selectedTower && r.month === month && (r as any).report_type === 'recon_list') ? 'Update 30th' : 'Upload 30th'}
+                              <Upload className="h-3 w-3" />{' '}
+                              {monthlyReports.find(
+                                (r) =>
+                                  (r as any).tower === selectedTower &&
+                                  r.month === month &&
+                                  (r as any).report_type === 'defaulters_30th'
+                              )
+                                ? 'Update 30th'
+                                : 'Upload 30th'}
                             </Button>
                           </div>
                         </div>
@@ -1092,8 +1161,20 @@ export default function CAMTracking() {
                       const mYear = month <= 3 ? selectedYear + 1 : selectedYear;
 
                       // Show reports for the currently selected tower in this tab too
-                      const defaulterReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'defaulters_list');
-                      const reconReport = monthlyReports.find(r => r.month === month && r.year === selectedYear && (r as any).tower === selectedTower && r.report_type === 'recon_list');
+                      const defaulterReport = monthlyReports.find(
+                        (r) =>
+                          r.month === month &&
+                          r.year === selectedYear &&
+                          (r as any).tower === selectedTower &&
+                          r.report_type === 'defaulters_20th'
+                      );
+                      const reconReport = monthlyReports.find(
+                        (r) =>
+                          r.month === month &&
+                          r.year === selectedYear &&
+                          (r as any).tower === selectedTower &&
+                          r.report_type === 'defaulters_30th'
+                      );
                       return <TableRow key={month}>
                             <TableCell className="font-medium text-xs">{MONTH_NAMES[month]} {mYear}</TableCell>
                             <TableCell className="text-xs font-bold">Tower {selectedTower}</TableCell>
@@ -1104,7 +1185,7 @@ export default function CAMTracking() {
                                     Download
                                   </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
                                 {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
-                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_list', selectedTower)} />
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_20th', selectedTower)} />
                                     <Button variant="outline" size="sm">
                                       <Upload className="h-3 w-3 mr-1" />
                                       {defaulterReport ? 'Update' : 'Upload'}
@@ -1119,7 +1200,7 @@ export default function CAMTracking() {
                                     Download
                                   </Button> : <span className="text-xs text-muted-foreground">Not uploaded</span>}
                                 {(userRole === 'lead' || userRole === 'admin' || userRole === 'treasurer' || isMC) && <div className="relative">
-                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'recon_list', selectedTower)} />
+                                    <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={e => handleReportUpload(e, month, 'defaulters_30th', selectedTower)} />
                                     <Button variant="outline" size="sm">
                                       <Upload className="h-3 w-3 mr-1" />
                                       {reconReport ? 'Update' : 'Upload'}

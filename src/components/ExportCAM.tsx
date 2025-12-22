@@ -140,8 +140,8 @@ export function ExportCAM() {
       const rows = (data || []) as Array<{
         year: number;
         month: number;
-        report_type: 'defaulters_list' | 'recon_list';
-        document_url: string;
+        report_type: 'defaulters_20th' | 'defaulters_30th';
+        file_url: string;
         status?: string | null;
       }>;
 
@@ -155,14 +155,14 @@ export function ExportCAM() {
             year: row.year,
             month: row.month,
             status: row.status || 'draft',
-            defaulters_list_url: null,
-            recon_list_url: null,
+            defaulters_list_url: null, // 20th
+            recon_list_url: null,      // 30th
           };
         }
-        if (row.report_type === 'defaulters_list') {
-          grouped[key].defaulters_list_url = row.document_url;
-        } else if (row.report_type === 'recon_list') {
-          grouped[key].recon_list_url = row.document_url;
+        if (row.report_type === 'defaulters_20th') {
+          grouped[key].defaulters_list_url = row.file_url;
+        } else if (row.report_type === 'defaulters_30th') {
+          grouped[key].recon_list_url = row.file_url;
         }
       });
 
@@ -172,14 +172,21 @@ export function ExportCAM() {
     }
   };
 
-  const handleReportUpload = async (event: React.ChangeEvent<HTMLInputElement>, month: number, year: number, type: 'defaulters_list' | 'recon_list') => {
+  const handleReportUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+    month: number,
+    year: number,
+    type: 'defaulters_20th' | 'defaulters_30th'
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !mcUser) return;
 
     try {
       setSaving(true);
       const fileExt = file.name.split('.').pop();
-      const fileName = `monthly_reports/${year}/${month}/${type}_${Date.now()}.${fileExt}`;
+
+      // IMPORTANT: storage policy expects the first folder to be "monthly-reports"
+      const fileName = `monthly-reports/${year}/${mcUser.tower_no}/${month}/${type}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('cam')
@@ -189,18 +196,23 @@ export function ExportCAM() {
 
       const { error: dbError } = await (supabase as any)
         .from('cam_monthly_reports')
-        .upsert({
-          year: year,
-          month: month,
-          tower: mcUser.tower_no,
-          report_type: type,
-          document_url: fileName,
-          uploaded_by: mcUser.id,
-        }, { onConflict: 'year,month,tower,report_type' });
+        .upsert(
+          {
+            year,
+            month,
+            tower: mcUser.tower_no,
+            report_type: type,
+            file_url: fileName,
+            uploaded_by: mcUser.id,
+          },
+          { onConflict: 'tower,year,month,report_type' }
+        );
 
       if (dbError) throw dbError;
 
-      toast.success(`${type === 'defaulters_list' ? 'Defaulters List' : 'Recon List'} uploaded for ${MONTH_NAMES[month]}`);
+      toast.success(
+        `${type === 'defaulters_20th' ? '20th (Without Recon)' : '30th (With Recon)'} uploaded for ${MONTH_NAMES[month]}`
+      );
       fetchMonthlyReports();
     } catch (error: any) {
       toast.error('Upload failed: ' + error.message);
@@ -479,57 +491,57 @@ export function ExportCAM() {
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-medium text-muted-foreground">20th Report (Without Recon)</p>
-                      <div className="flex gap-1">
-                        {report.defaulters_list_url ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-7 w-7 p-0 flex-shrink-0"
-                            onClick={() => downloadReport(report.defaulters_list_url)}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : null}
-                        <div className="relative flex-1">
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_list')}
-                            disabled={saving}
-                          />
-                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                            <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
-                          </Button>
+                        <div className="flex gap-1">
+                          {report.defaulters_list_url ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 w-7 p-0 flex-shrink-0"
+                              onClick={() => downloadReport(report.defaulters_list_url)}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                          <div className="relative flex-1">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_20th')}
+                              disabled={saving}
+                            />
+                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                              <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-1.5">
-                      <p className="text-[10px] font-medium text-muted-foreground">30th Report (With Recon)</p>
-                      <div className="flex gap-1">
-                        {report.recon_list_url ? (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-7 w-7 p-0 flex-shrink-0"
-                            onClick={() => downloadReport(report.recon_list_url)}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : null}
-                        <div className="relative flex-1">
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'recon_list')}
-                            disabled={saving}
-                          />
-                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                            <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
-                          </Button>
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] font-medium text-muted-foreground">30th Report (With Recon)</p>
+                        <div className="flex gap-1">
+                          {report.recon_list_url ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-7 w-7 p-0 flex-shrink-0"
+                              onClick={() => downloadReport(report.recon_list_url)}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                          <div className="relative flex-1">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_30th')}
+                              disabled={saving}
+                            />
+                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                              <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
                   </div>
                 </div>
               ))}
