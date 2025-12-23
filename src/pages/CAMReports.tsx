@@ -248,31 +248,11 @@ export default function CAMReports() {
         }
 
         if (!isFullUrl(documentUrl)) {
-            // Try new Supabase storage first
             const { data, error } = await supabase.storage
                 .from('cam')
                 .createSignedUrl(documentUrl, 3600);
-
-            // If file exists in new storage, use it
-            if (!error && data?.signedUrl) {
-                return data.signedUrl;
-            }
-
-            // Fall back to old Lovable storage for migrated data
-            console.log(`File not in new storage, trying old: cam/${documentUrl}`);
-            const oldStorageUrl = `https://ujnxljbaapuvpnjdkick.supabase.co/storage/v1/object/public/cam/${documentUrl}`;
-
-            // Check if file exists in old storage
-            try {
-                const response = await fetch(oldStorageUrl, { method: 'HEAD' });
-                if (response.ok) {
-                    return oldStorageUrl;
-                }
-            } catch (e) {
-                console.error('File not found in old storage either:', e);
-            }
-
-            throw new Error('File not found in either storage location');
+            if (error) throw error;
+            return data.signedUrl;
         }
 
         return documentUrl;
@@ -755,7 +735,7 @@ export default function CAMReports() {
                                     </div>
 
                                     <p className="text-xs text-muted-foreground mt-2">
-                                        {userRole === 'treasurer'
+                                        {userRole === 'treasurer' 
                                             ? 'Note: Select missing records and click "Send Reminder" to notify Lead users.'
                                             : 'Note: Click "Upload Document" to go to CAM Entry and upload the missing document for that tower-quarter.'}
                                     </p>

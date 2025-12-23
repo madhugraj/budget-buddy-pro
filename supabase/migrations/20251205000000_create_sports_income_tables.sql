@@ -56,19 +56,12 @@ ON public.sports_master FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Office assistant can insert sports master" ON public.sports_master;
 CREATE POLICY "Office assistant can insert sports master"
 ON public.sports_master FOR INSERT TO authenticated
-WITH CHECK (
-    EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text = 'office_assistant')
-    OR public.has_role(auth.uid(), 'treasurer')
-);
+WITH CHECK (has_role(auth.uid(), 'office_assistant') OR has_role(auth.uid(), 'treasurer'));
 
 DROP POLICY IF EXISTS "Office assistant can update sports master" ON public.sports_master;
 CREATE POLICY "Office assistant can update sports master"
 ON public.sports_master FOR UPDATE TO authenticated
-USING (
-    EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text = 'office_assistant')
-    OR public.has_role(auth.uid(), 'treasurer')
-);
-
+USING (has_role(auth.uid(), 'office_assistant') OR has_role(auth.uid(), 'treasurer'));
 
 DROP POLICY IF EXISTS "Treasurer can delete sports master" ON public.sports_master;
 CREATE POLICY "Treasurer can delete sports master"
@@ -83,20 +76,12 @@ ON public.sports_income FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Office assistant can insert sports income" ON public.sports_income;
 CREATE POLICY "Office assistant can insert sports income"
 ON public.sports_income FOR INSERT TO authenticated
-WITH CHECK (
-    EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text = 'office_assistant')
-    OR public.has_role(auth.uid(), 'treasurer')
-);
+WITH CHECK (has_role(auth.uid(), 'office_assistant') OR has_role(auth.uid(), 'treasurer'));
 
 DROP POLICY IF EXISTS "Office assistant and treasurer can update sports income" ON public.sports_income;
 CREATE POLICY "Office assistant and treasurer can update sports income"
 ON public.sports_income FOR UPDATE TO authenticated
-USING (
-    EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role::text = 'office_assistant')
-    OR public.has_role(auth.uid(), 'treasurer')
-    OR public.has_role(auth.uid(), 'accountant')
-);
-
+USING (has_role(auth.uid(), 'office_assistant') OR has_role(auth.uid(), 'treasurer') OR has_role(auth.uid(), 'accountant'));
 
 DROP POLICY IF EXISTS "Treasurer can delete sports income" ON public.sports_income;
 CREATE POLICY "Treasurer can delete sports income"
@@ -115,43 +100,34 @@ BEFORE UPDATE ON public.sports_income
 FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 -- Insert default sports
-DO $$
-DECLARE
-  v_user_id UUID;
-BEGIN
-  SELECT id INTO v_user_id FROM auth.users LIMIT 1;
-  
-  IF v_user_id IS NOT NULL THEN
-    INSERT INTO public.sports_master (sport_name, coach_trainer_academy, location, training_days, duration, num_students, base_fare, gst_amount, total_amount, created_by, is_active)
-    SELECT 
-      sport, 
-      'To be configured', 
-      'To be configured', 
-      ARRAY['Monday', 'Wednesday', 'Friday'], 
-      '1 hour', 
-      0, 
-      0, 
-      0, 
-      0,
-      v_user_id,
-      false
-    FROM unnest(ARRAY[
-      'Badminton',
-      'Swimming',
-      'Football',
-      'Basketball',
-      'Skating',
-      'Tennis',
-      'Yoga',
-      'Bharatanatyam',
-      'Dance',
-      'Zumba',
-      'Cricket',
-      'Aero Fitness',
-      'Chess',
-      'Karate',
-      'Silambattam'
-    ]) AS sport
-    WHERE NOT EXISTS (SELECT 1 FROM public.sports_master WHERE sport_name = sport);
-  END IF;
-END $$;
+INSERT INTO public.sports_master (sport_name, coach_trainer_academy, location, training_days, duration, num_students, base_fare, gst_amount, total_amount, created_by, is_active)
+SELECT 
+  sport, 
+  'To be configured', 
+  'To be configured', 
+  ARRAY['Monday', 'Wednesday', 'Friday'], 
+  '1 hour', 
+  0, 
+  0, 
+  0, 
+  0,
+  (SELECT id FROM auth.users LIMIT 1),
+  false
+FROM unnest(ARRAY[
+  'Badminton',
+  'Swimming',
+  'Football',
+  'Basketball',
+  'Skating',
+  'Tennis',
+  'Yoga',
+  'Bharatanatyam',
+  'Dance',
+  'Zumba',
+  'Cricket',
+  'Aero Fitness',
+  'Chess',
+  'Karate',
+  'Silambattam'
+]) AS sport
+WHERE NOT EXISTS (SELECT 1 FROM public.sports_master WHERE sport_name = sport);

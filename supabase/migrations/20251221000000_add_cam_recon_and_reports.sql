@@ -41,7 +41,7 @@ BEGIN
           EXISTS (
             SELECT 1 FROM public.user_roles
             WHERE user_id = auth.uid()
-            AND role IN ('lead', 'treasurer')
+            AND role IN ('lead', 'admin', 'treasurer')
           )
         );
     END IF;
