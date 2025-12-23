@@ -126,13 +126,16 @@ export function ExportCAM() {
         targetMonths = [parseInt(selectedMonth)];
       }
 
-      let query = (supabase as any)
+      // For MC users, filter by their tower
+      // Build query with tower filter if MC user
+      let query = supabase
         .from('cam_monthly_reports')
         .select('*')
         .eq('year', selectedYear)
         .in('month', targetMonths);
 
-      if (mcUser) {
+      // MC users should only see their tower's reports
+      if (mcUser?.tower_no) {
         query = query.eq('tower', mcUser.tower_no);
       }
 
@@ -145,20 +148,22 @@ export function ExportCAM() {
       const rows = (data || []) as Array<{
         year: number;
         month: number;
-        report_type: 'defaulters_20th' | 'defaulters_30th';
+        tower: string;
+        report_type: string;
         file_url: string;
         status?: string | null;
       }>;
 
-      // Group by year and month
+      // Group by year, month, and tower
       const grouped: Record<string, any> = {};
       rows.forEach((row) => {
-        const key = `${row.year}-${row.month}`;
+        const key = `${row.year}-${row.month}-${row.tower}`;
         if (!grouped[key]) {
           grouped[key] = {
             id: key,
             year: row.year,
             month: row.month,
+            tower: row.tower,
             status: row.status || 'draft',
             defaulters_list_url: null, // 20th
             recon_list_url: null,      // 30th
@@ -230,12 +235,17 @@ export function ExportCAM() {
 
   const downloadReport = async (path: string) => {
     try {
-      const { data, error } = await supabase.storage
+      // Use getPublicUrl for MC users since they're not Supabase authenticated
+      // For authenticated users, we can still use this method since storage policy allows SELECT
+      const { data } = supabase.storage
         .from('cam')
-        .createSignedUrl(path, 3600);
+        .getPublicUrl(path);
 
-      if (error) throw error;
-      window.open(data.signedUrl, '_blank');
+      if (data?.publicUrl) {
+        window.open(data.publicUrl, '_blank');
+      } else {
+        throw new Error('Could not generate download URL');
+      }
     } catch (error: any) {
       toast.error('Download failed: ' + error.message);
     }
@@ -486,12 +496,16 @@ export function ExportCAM() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Download Monthly Lists</CardTitle>
-          <CardDescription>Download detailed defaulter and reconciliation lists uploaded by administration</CardDescription>
+          <CardDescription>
+            {mcUser 
+              ? `View and download defaulter lists for Tower ${mcUser.tower_no}` 
+              : 'Download detailed defaulter and reconciliation lists uploaded by administration'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {monthlyReports.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-lg">
-              No monthly lists uploaded yet.
+              No monthly lists uploaded yet for the selected period.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -501,7 +515,7 @@ export function ExportCAM() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold">{MONTH_NAMES[report.month]} {report.year}</p>
-                      <p className="text-[10px] text-muted-foreground">Tower {mcUser?.tower_no} Reports</p>
+                      <p className="text-[10px] text-muted-foreground">Tower {report.tower || mcUser?.tower_no} Reports</p>
                     </div>
                     <Badge variant={report.status === 'final' ? 'default' : 'secondary'} className="text-[9px] h-4">
                       {report.status}
@@ -516,23 +530,29 @@ export function ExportCAM() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-7 w-7 p-0 flex-shrink-0"
+                            className={mcUser ? "h-7 flex-1 gap-1" : "h-7 w-7 p-0 flex-shrink-0"}
                             onClick={() => downloadReport(report.defaulters_list_url)}
                           >
                             <Download className="h-3.5 w-3.5" />
+                            {mcUser && <span className="text-[10px]">Download</span>}
                           </Button>
-                        ) : null}
-                        <div className="relative flex-1">
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_20th')}
-                            disabled={saving}
-                          />
-                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                            <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
-                          </Button>
-                        </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground italic">Not uploaded</span>
+                        )}
+                        {/* Only show upload for non-MC users (Leads/Treasurers) */}
+                        {!mcUser && (
+                          <div className="relative flex-1">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_20th')}
+                              disabled={saving}
+                            />
+                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                              <Upload className="h-3 w-3" /> {report.defaulters_list_url ? 'Update' : 'Upload'}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -543,23 +563,29 @@ export function ExportCAM() {
                           <Button
                             size="sm"
                             variant="secondary"
-                            className="h-7 w-7 p-0 flex-shrink-0"
+                            className={mcUser ? "h-7 flex-1 gap-1" : "h-7 w-7 p-0 flex-shrink-0"}
                             onClick={() => downloadReport(report.recon_list_url)}
                           >
                             <Download className="h-3.5 w-3.5" />
+                            {mcUser && <span className="text-[10px]">Download</span>}
                           </Button>
-                        ) : null}
-                        <div className="relative flex-1">
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                            onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_30th')}
-                            disabled={saving}
-                          />
-                          <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
-                            <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
-                          </Button>
-                        </div>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground italic">Not uploaded</span>
+                        )}
+                        {/* Only show upload for non-MC users (Leads/Treasurers) */}
+                        {!mcUser && (
+                          <div className="relative flex-1">
+                            <input
+                              type="file"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={(e) => handleReportUpload(e, report.month, report.year, 'defaulters_30th')}
+                              disabled={saving}
+                            />
+                            <Button variant="outline" size="sm" className="h-7 w-full text-[10px] gap-1">
+                              <Upload className="h-3 w-3" /> {report.recon_list_url ? 'Update' : 'Upload'}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
