@@ -87,14 +87,19 @@ export function ExportCAM() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - 2023 + 2 }, (_, i) => 2024 + i);
 
+  // Load MC user from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('mc_user');
     if (stored) {
       setMcUser(JSON.parse(stored));
     }
+  }, []);
+
+  // Fetch data when filters change OR when mcUser is loaded
+  useEffect(() => {
     fetchCAMData();
     fetchMonthlyReports();
-  }, [selectedYear, selectedQuarter, selectedMonth]);
+  }, [selectedYear, selectedQuarter, selectedMonth, mcUser]);
 
   const fetchCAMData = async () => {
     setLoading(true);
