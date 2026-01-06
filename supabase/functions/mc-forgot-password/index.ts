@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +14,44 @@ function generateTempPassword(): string {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return password;
+}
+
+async function sendEmailViaGmail(to: string, subject: string, htmlContent: string): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = "pbv.mc.2527@gmail.com";
+  const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD");
+
+  if (!gmailAppPassword) {
+    return { success: false, error: "Gmail App Password not configured" };
+  }
+
+  try {
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: gmailUser,
+          password: gmailAppPassword.replace(/\s/g, ''), // Remove spaces from app password
+        },
+      },
+    });
+
+    await client.send({
+      from: gmailUser,
+      to: to,
+      subject: subject,
+      content: "Please view this email in an HTML-capable email client.",
+      html: htmlContent,
+    });
+
+    await client.close();
+    console.log("Email sent successfully via Gmail SMTP to:", to);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gmail SMTP error:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -67,13 +103,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Failed to reset password");
     }
 
-    // Send password reset email
-    const emailResponse = await resend.emails.send({
-      from: "Prestige Bella Vista <pbv.mc.2527@gmail.com>",
-      reply_to: "pbv.mc.2527@gmail.com",
-      to: [mcUser.email],
-      subject: "Prestige Bella Vista - Password Reset",
-      html: `
+    // Send password reset email via Gmail SMTP
+    const emailResult = await sendEmailViaGmail(
+      mcUser.email,
+      "Prestige Bella Vista - Password Reset",
+      `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
             <h1 style="color: #fff; margin: 0; font-size: 24px;">🔐 Password Reset</h1>
@@ -103,7 +137,7 @@ const handler = async (req: Request): Promise<Response> => {
             </p>
             
             <p style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 8px; font-size: 14px; margin-top: 15px;">
-              🚨 If you did not request this reset, please reply to this email immediately.
+              🚨 If you did not request this reset, please contact the management immediately.
             </p>
             
             <p style="margin-top: 30px; color: #333;">
@@ -117,13 +151,12 @@ const handler = async (req: Request): Promise<Response> => {
             <p>This is an automated message from Prestige Bella Vista Society Portal</p>
           </div>
         </div>
-      `,
-    });
+      `
+    );
 
-    console.log("Password reset email send result:", JSON.stringify(emailResponse, null, 2));
-    if ((emailResponse as any)?.error) {
-      console.error("Resend password reset email error:", JSON.stringify((emailResponse as any).error, null, 2));
-      throw new Error((emailResponse as any).error?.message || "Failed to send password reset email");
+    if (!emailResult.success) {
+      console.error("Failed to send password reset email:", emailResult.error);
+      throw new Error("Failed to send password reset email");
     }
 
     return new Response(

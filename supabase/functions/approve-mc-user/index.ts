@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +22,44 @@ function generateSecureToken(): string {
 function generateUsername(name: string, unitNo: string): string {
   const cleanName = name.split(' ')[0].charAt(0).toUpperCase() + name.split(' ')[0].slice(1).toLowerCase();
   return `${cleanName}-${unitNo}@mc-2527`;
+}
+
+async function sendEmailViaGmail(to: string, subject: string, htmlContent: string): Promise<{ success: boolean; error?: string }> {
+  const gmailUser = "pbv.mc.2527@gmail.com";
+  const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD");
+
+  if (!gmailAppPassword) {
+    return { success: false, error: "Gmail App Password not configured" };
+  }
+
+  try {
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: gmailUser,
+          password: gmailAppPassword.replace(/\s/g, ''), // Remove spaces from app password
+        },
+      },
+    });
+
+    await client.send({
+      from: gmailUser,
+      to: to,
+      subject: subject,
+      content: "Please view this email in an HTML-capable email client.",
+      html: htmlContent,
+    });
+
+    await client.close();
+    console.log("Email sent successfully via Gmail SMTP to:", to);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Gmail SMTP error:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -90,47 +126,35 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (updateError) throw updateError;
 
-      // Try to send rejection email (don't fail if email fails)
-      let emailError = null;
-      try {
-        const rejectionEmail = await resend.emails.send({
-          from: "Prestige Bella Vista <onboarding@resend.dev>",
-          to: [mcUser.email],
-          subject: "Prestige Bella Vista - MC Registration Update",
-          html: `
-            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-                <h1 style="color: #fff; margin: 0; font-size: 24px;">Prestige Bella Vista</h1>
-                <p style="color: #f0e6d3; margin: 10px 0 0 0;">Management Committee</p>
-              </div>
-              <div style="background: #fff; padding: 30px; border: 1px solid #e0d6c8; border-top: none; border-radius: 0 0 10px 10px;">
-                <h2 style="color: #8B4513; margin-top: 0;">Registration Status Update</h2>
-                <p>Dear <strong>${mcUser.name}</strong>,</p>
-                <p>Thank you for your interest in joining the Management Committee at Prestige Bella Vista.</p>
-                <p>After careful review, we regret to inform you that your registration has not been approved at this time.</p>
-                ${rejection_reason ? `<div style="background: #fef3cd; border-left: 4px solid #856404; padding: 15px; margin: 20px 0;"><strong>Reason:</strong> ${rejection_reason}</div>` : ''}
-                <p>If you have any questions or would like to discuss this decision, please contact the management.</p>
-                <p style="margin-top: 30px;">Warm regards,<br><strong>Treasurer</strong><br>Prestige Bella Vista Management</p>
-              </div>
+      // Send rejection email via Gmail SMTP
+      const emailResult = await sendEmailViaGmail(
+        mcUser.email,
+        "Prestige Bella Vista - MC Registration Update",
+        `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="color: #fff; margin: 0; font-size: 24px;">Prestige Bella Vista</h1>
+              <p style="color: #f0e6d3; margin: 10px 0 0 0;">Management Committee</p>
             </div>
-          `,
-        });
-
-        if ((rejectionEmail as any)?.error) {
-          emailError = (rejectionEmail as any).error?.message || "Failed to send rejection email";
-          console.error("Resend rejection email error:", emailError);
-        }
-      } catch (e: any) {
-        emailError = e.message;
-        console.error("Email send exception:", e);
-      }
+            <div style="background: #fff; padding: 30px; border: 1px solid #e0d6c8; border-top: none; border-radius: 0 0 10px 10px;">
+              <h2 style="color: #8B4513; margin-top: 0;">Registration Status Update</h2>
+              <p>Dear <strong>${mcUser.name}</strong>,</p>
+              <p>Thank you for your interest in joining the Management Committee at Prestige Bella Vista.</p>
+              <p>After careful review, we regret to inform you that your registration has not been approved at this time.</p>
+              ${rejection_reason ? `<div style="background: #fef3cd; border-left: 4px solid #856404; padding: 15px; margin: 20px 0;"><strong>Reason:</strong> ${rejection_reason}</div>` : ''}
+              <p>If you have any questions or would like to discuss this decision, please contact the management.</p>
+              <p style="margin-top: 30px;">Warm regards,<br><strong>Treasurer</strong><br>Prestige Bella Vista Management</p>
+            </div>
+          </div>
+        `
+      );
 
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: "MC user rejected",
-          emailSent: !emailError,
-          emailError: emailError
+          emailSent: emailResult.success,
+          emailError: emailResult.error
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
@@ -175,79 +199,67 @@ const handler = async (req: Request): Promise<Response> => {
     const appUrl = "https://prestige-bella-vista-2025-26-expensemgt.lovable.app";
     const passwordSetupUrl = `${appUrl}/mc-set-password?token=${passwordSetupToken}`;
 
-    // Try to send approval email with magic link
-    let emailError = null;
-    try {
-      const emailResponse = await resend.emails.send({
-        from: "Prestige Bella Vista <onboarding@resend.dev>",
-        to: [mcUser.email],
-        subject: "🎉 Welcome to Prestige Bella Vista Management Committee!",
-        html: `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: #fff; margin: 0; font-size: 28px;">🏠 Welcome Aboard!</h1>
-              <p style="color: #f0e6d3; margin: 10px 0 0 0; font-size: 16px;">Prestige Bella Vista Management Committee</p>
-            </div>
-            
-            <div style="background: #fff; padding: 30px; border: 1px solid #e0d6c8; border-top: none;">
-              <p style="font-size: 18px; color: #333;">Dear <strong>${mcUser.name}</strong>,</p>
-              
-              <p style="color: #555; line-height: 1.6;">Congratulations! Your registration to join the <strong>Prestige Bella Vista Management Committee</strong> has been approved.</p>
-              
-              <div style="background: linear-gradient(135deg, #f8f4f0 0%, #fff 100%); border: 2px solid #8B4513; border-radius: 10px; padding: 25px; margin: 25px 0;">
-                <h3 style="color: #8B4513; margin-top: 0; text-align: center;">🔐 Set Up Your Password</h3>
-                <p style="text-align: center; color: #555;">Click the button below to create your password and access the MC Portal:</p>
-                <div style="text-align: center; margin: 20px 0;">
-                  <a href="${passwordSetupUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); color: #fff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Set My Password</a>
-                </div>
-                <p style="color: #666; font-size: 12px; text-align: center; margin: 0;">This link expires in 7 days.</p>
-              </div>
-              
-              <div style="background: #f8f9fa; border-left: 4px solid #8B4513; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0; color: #555;"><strong>Your Username:</strong></p>
-                <p style="font-family: monospace; background: #fff; padding: 8px 12px; border-radius: 5px; margin: 10px 0 0 0; display: inline-block;">${finalUsername}</p>
-              </div>
-              
-              <div style="background: #f0f7f0; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-                <h4 style="color: #28a745; margin: 0 0 10px 0;">📋 Your Interest Groups</h4>
-                <ul style="margin: 0; padding-left: 20px; color: #555;">
-                  ${mcUser.interest_groups.map((g: string) => `<li style="padding: 5px 0;">${g}</li>`).join('')}
-                </ul>
-              </div>
-              
-              <p style="margin-top: 30px; color: #333;">
-                Warm regards,<br>
-                <strong>Treasurer</strong><br>
-                <span style="color: #8B4513;">Prestige Bella Vista Management</span>
-              </p>
-            </div>
-            
-            <div style="text-align: center; padding: 20px; color: #888; font-size: 12px; background: #f8f4f0; border-radius: 0 0 10px 10px;">
-              <p style="margin: 0;">Unit: ${mcUser.tower_no}-${mcUser.unit_no} | Tower ${mcUser.tower_no}</p>
-              <p style="margin: 10px 0 0 0;">This is an automated message from Prestige Bella Vista Society Portal</p>
-            </div>
+    // Send approval email via Gmail SMTP
+    const emailResult = await sendEmailViaGmail(
+      mcUser.email,
+      "🎉 Welcome to Prestige Bella Vista Management Committee!",
+      `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: #fff; margin: 0; font-size: 28px;">🏠 Welcome Aboard!</h1>
+            <p style="color: #f0e6d3; margin: 10px 0 0 0; font-size: 16px;">Prestige Bella Vista Management Committee</p>
           </div>
-        `,
-      });
+          
+          <div style="background: #fff; padding: 30px; border: 1px solid #e0d6c8; border-top: none;">
+            <p style="font-size: 18px; color: #333;">Dear <strong>${mcUser.name}</strong>,</p>
+            
+            <p style="color: #555; line-height: 1.6;">Congratulations! Your registration to join the <strong>Prestige Bella Vista Management Committee</strong> has been approved.</p>
+            
+            <div style="background: linear-gradient(135deg, #f8f4f0 0%, #fff 100%); border: 2px solid #8B4513; border-radius: 10px; padding: 25px; margin: 25px 0;">
+              <h3 style="color: #8B4513; margin-top: 0; text-align: center;">🔐 Set Up Your Password</h3>
+              <p style="text-align: center; color: #555;">Click the button below to create your password and access the MC Portal:</p>
+              <div style="text-align: center; margin: 20px 0;">
+                <a href="${passwordSetupUrl}" style="display: inline-block; background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); color: #fff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Set My Password</a>
+              </div>
+              <p style="color: #666; font-size: 12px; text-align: center; margin: 0;">This link expires in 7 days.</p>
+            </div>
+            
+            <div style="background: #f8f9fa; border-left: 4px solid #8B4513; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+              <p style="margin: 0; color: #555;"><strong>Your Username:</strong></p>
+              <p style="font-family: monospace; background: #fff; padding: 8px 12px; border-radius: 5px; margin: 10px 0 0 0; display: inline-block;">${finalUsername}</p>
+            </div>
+            
+            <div style="background: #f0f7f0; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+              <h4 style="color: #28a745; margin: 0 0 10px 0;">📋 Your Interest Groups</h4>
+              <ul style="margin: 0; padding-left: 20px; color: #555;">
+                ${mcUser.interest_groups.map((g: string) => `<li style="padding: 5px 0;">${g}</li>`).join('')}
+              </ul>
+            </div>
+            
+            <p style="margin-top: 30px; color: #333;">
+              Warm regards,<br>
+              <strong>Treasurer</strong><br>
+              <span style="color: #8B4513;">Prestige Bella Vista Management</span>
+            </p>
+          </div>
+          
+          <div style="text-align: center; padding: 20px; color: #888; font-size: 12px; background: #f8f4f0; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0;">Unit: ${mcUser.tower_no}-${mcUser.unit_no} | Tower ${mcUser.tower_no}</p>
+            <p style="margin: 10px 0 0 0;">This is an automated message from Prestige Bella Vista Society Portal</p>
+          </div>
+        </div>
+      `
+    );
 
-      console.log("Approval email send result:", JSON.stringify(emailResponse, null, 2));
-
-      if ((emailResponse as any)?.error) {
-        emailError = (emailResponse as any).error?.message || "Failed to send approval email";
-        console.error("Resend approval email error:", emailError);
-      }
-    } catch (e: any) {
-      emailError = e.message;
-      console.error("Email send exception:", e);
-    }
+    console.log("Approval completed. Email sent:", emailResult.success, "Error:", emailResult.error);
 
     return new Response(
       JSON.stringify({
         success: true,
         message: "MC user approved",
         username: finalUsername,
-        emailSent: !emailError,
-        emailError: emailError,
+        emailSent: emailResult.success,
+        emailError: emailResult.error,
         passwordSetupUrl: passwordSetupUrl // For admin reference if email fails
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
