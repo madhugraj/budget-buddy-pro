@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
 import { LeadNotificationBell } from '@/components/LeadNotificationBell';
 import { AutoLogout } from '@/components/AutoLogout';
+import { StaffAIChatbot } from '@/components/StaffAIChatbot';
 
 const navigationGroups = [
   {
@@ -339,6 +340,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+
+      {/* Staff AI Chatbot - floating button */}
+      <StaffAIChatbot />
     </div>
   );
 }

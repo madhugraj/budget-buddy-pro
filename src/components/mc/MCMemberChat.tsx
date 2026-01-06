@@ -502,9 +502,10 @@ export function MCMemberChat({ currentUser }: MCMemberChatProps) {
 
       {/* All Members */}
       <div className="p-3 border-t">
-        <p className="text-xs text-muted-foreground mb-2">All Members</p>
-        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto">
-          {allMembers.slice(0, 6).map((member) => (
+        <p className="text-xs text-muted-foreground mb-2">All Members ({allMembers.length})</p>
+        <ScrollArea className="max-h-40">
+          <div className="grid grid-cols-2 gap-1">
+            {allMembers.map((member) => (
             <button
               key={member.id}
               onClick={() => startDM(member)}
@@ -521,8 +522,9 @@ export function MCMemberChat({ currentUser }: MCMemberChatProps) {
               </div>
               <span className="text-xs truncate">{member.name.split(' ')[0]}</span>
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );
