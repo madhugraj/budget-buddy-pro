@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-mc-reminder]
 verify_jwt = true
+
+[functions.mc-ai-chat]
+verify_jwt = false
