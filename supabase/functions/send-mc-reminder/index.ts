@@ -92,6 +92,7 @@ serve(async (req) => {
     const baseUrl = req.headers.get("origin") || "https://pbv-mc-portal.lovable.app";
     let sentCount = 0;
     const errors: string[] = [];
+    const sentTo: string[] = [];
 
     for (const user of usersToRemind) {
       try {
@@ -144,6 +145,7 @@ serve(async (req) => {
 
         await sendEmailViaGmail(user.email, "Reminder: Complete Your MC Portal Registration", emailHtml);
         sentCount++;
+        sentTo.push(user.name);
       } catch (emailError: any) {
         console.error(`Failed to send reminder to ${user.email}:`, emailError);
         errors.push(`${user.name}: ${emailError.message}`);
@@ -155,6 +157,7 @@ serve(async (req) => {
         success: true,
         sent: sentCount,
         total: usersToRemind.length,
+        sentTo: sentTo,
         errors: errors.length > 0 ? errors : undefined,
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }

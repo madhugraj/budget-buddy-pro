@@ -58,12 +58,17 @@ export default function MCApprovals() {
 
       if (error) throw error;
 
-      const response = data as { success: boolean; sent: number; total: number; errors?: string[] };
+      const response = data as { success: boolean; sent: number; total: number; sentTo?: string[]; errors?: string[] };
 
       if (response.sent > 0) {
+        const names = response.sentTo || [];
+        const namesList = names.length <= 3 
+          ? names.join(', ')
+          : `${names.slice(0, 3).join(', ')} and ${names.length - 3} more`;
+        
         toast({
-          title: 'Reminder Sent',
-          description: `Successfully sent ${response.sent} reminder email${response.sent > 1 ? 's' : ''}.`,
+          title: `✅ Reminder Sent (${response.sent}/${response.total})`,
+          description: `Sent to: ${namesList}`,
         });
       } else {
         toast({
