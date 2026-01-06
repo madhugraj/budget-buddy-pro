@@ -72,15 +72,25 @@ export function ExportIncome() {
             query = query.eq('status', status);
         }
 
-        // Filter by month range if dates are provided
-        // Convert date range to month numbers (1-12)
-        if (dateFrom) {
-            const fromMonth = dateFrom.getMonth() + 1; // JS months are 0-indexed
+        // Note: The income_actuals table uses month (1-12) without year context in the filter
+        // Since fiscal_year is a string like "FY25-26", we cannot easily filter by date range
+        // For now, if both dates are provided and span across years, we skip month filtering
+        // to avoid the impossible condition (e.g., month >= 11 AND month <= 1)
+        if (dateFrom && dateTo) {
+            const fromMonth = dateFrom.getMonth() + 1;
+            const toMonth = dateTo.getMonth() + 1;
+            
+            if (fromMonth <= toMonth) {
+                // Same year range (e.g., March to August)
+                query = query.gte('month', fromMonth).lte('month', toMonth);
+            }
+            // If fromMonth > toMonth (e.g., November to January), skip month filter
+            // as it would create an impossible condition
+        } else if (dateFrom) {
+            const fromMonth = dateFrom.getMonth() + 1;
             query = query.gte('month', fromMonth);
-        }
-
-        if (dateTo) {
-            const toMonth = dateTo.getMonth() + 1; // JS months are 0-indexed
+        } else if (dateTo) {
+            const toMonth = dateTo.getMonth() + 1;
             query = query.lte('month', toMonth);
         }
 
