@@ -21,10 +21,13 @@ serve(async (req) => {
     // Fetch relevant data based on user role
     let contextData = "";
 
-    // Get current fiscal year
+    // Get current fiscal year in FY format (e.g., FY25-26)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
-    const fiscalYear = currentMonth >= 4 ? `${currentYear}-${currentYear + 1}` : `${currentYear - 1}-${currentYear}`;
+    // Fiscal year runs April to March. If we're in Jan 2026, it's FY25-26
+    const fiscalStartYear = currentMonth >= 4 ? currentYear : currentYear - 1;
+    const fiscalEndYear = fiscalStartYear + 1;
+    const fiscalYear = `FY${String(fiscalStartYear).slice(-2)}-${String(fiscalEndYear).slice(-2)}`;
 
     // Fetch expenses summary
     const { data: expenses } = await supabase
@@ -32,7 +35,7 @@ serve(async (req) => {
       .select(`
         id, amount, gst_amount, description, expense_date, status, budget_master_id
       `)
-      .gte("expense_date", `${fiscalYear.split("-")[0]}-04-01`)
+      .gte("expense_date", `${fiscalStartYear}-04-01`)
       .order("expense_date", { ascending: false })
       .limit(100);
 
@@ -63,7 +66,7 @@ serve(async (req) => {
     const { data: camTracking } = await supabase
       .from("cam_tracking")
       .select("*")
-      .eq("year", parseInt(fiscalYear.split("-")[0]))
+      .eq("year", fiscalStartYear)
       .order("month", { ascending: false });
 
     // Fetch petty cash summary
