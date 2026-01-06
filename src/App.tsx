@@ -27,6 +27,7 @@ import Savings from "./pages/Savings";
 import MCRegistration from "./pages/MCRegistration";
 import MCAuth from "./pages/MCAuth";
 import MCDashboard from "./pages/MCDashboard";
+import MCSetPassword from "./pages/MCSetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/mc-auth" element={<MCAuth />} />
             <Route path="/mc-register" element={<MCRegistration />} />
+            <Route path="/mc-set-password" element={<MCSetPassword />} />
             <Route path="/mc-dashboard" element={<MCDashboard />} />
             <Route
               path="/dashboard"

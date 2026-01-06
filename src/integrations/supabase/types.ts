@@ -549,6 +549,8 @@ export type Database = {
           login_username: string | null
           name: string
           password_hash: string | null
+          password_reset_expires_at: string | null
+          password_reset_token: string | null
           photo_url: string
           rejection_reason: string | null
           status: string
@@ -568,6 +570,8 @@ export type Database = {
           login_username?: string | null
           name: string
           password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           photo_url: string
           rejection_reason?: string | null
           status?: string
@@ -587,6 +591,8 @@ export type Database = {
           login_username?: string | null
           name?: string
           password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           photo_url?: string
           rejection_reason?: string | null
           status?: string
@@ -1030,6 +1036,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["user_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      set_mc_initial_password: {
+        Args: { p_new_password: string; p_token: string }
         Returns: boolean
       }
       update_mc_password: {

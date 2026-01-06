@@ -88,16 +88,38 @@ export default function MCApprovals() {
   const handleApprove = async (mcUser: MCUser) => {
     setProcessing(true);
     try {
-      const { error } = await supabase.functions.invoke('approve-mc-user', {
+      const { data, error } = await supabase.functions.invoke('approve-mc-user', {
         body: { mc_user_id: mcUser.id, action: 'approve' }
       });
 
       if (error) throw error;
 
-      toast({
-        title: 'MC User Approved',
-        description: `${mcUser.name} has been approved. Credentials generated.`,
-      });
+      const response = data as { success: boolean; emailSent: boolean; emailError?: string; passwordSetupUrl?: string };
+
+      if (response.success) {
+        if (response.emailSent) {
+          toast({
+            title: 'MC User Approved',
+            description: `${mcUser.name} has been approved and the password setup email has been sent.`,
+          });
+        } else {
+          // Approval succeeded but email failed
+          toast({
+            title: 'Approved (Email Failed)',
+            description: `${mcUser.name} approved, but email failed: ${response.emailError}. Share the link manually.`,
+            variant: 'destructive',
+          });
+          // Show the password setup URL for manual sharing
+          if (response.passwordSetupUrl) {
+            console.log('Password Setup URL for', mcUser.name, ':', response.passwordSetupUrl);
+            navigator.clipboard.writeText(response.passwordSetupUrl);
+            toast({
+              title: 'Link Copied',
+              description: 'Password setup link copied to clipboard. Share it with the user.',
+            });
+          }
+        }
+      }
 
       loadData();
       setSelectedMC(null);
