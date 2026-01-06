@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { LogOut, FileText, Building, User, LayoutDashboard } from 'lucide-react';
+import { LogOut, FileText, Building, User, LayoutDashboard, MessageCircle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Reports from './Reports';
 import { ExportCAM } from '@/components/ExportCAM';
-import Dashboard from './Dashboard'; // We can use Dashboard component or just the charts
+import Dashboard from './Dashboard';
+import { MCChatHub } from '@/components/mc/MCChatHub';
 
 interface MCUser {
   id: string;
@@ -87,7 +88,7 @@ export default function MCDashboard() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto p-4 md:p-6 pb-20">
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full max-w-xl grid-cols-3 bg-muted/50 p-1">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-muted/50 p-1">
             <TabsTrigger value="overview" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Overview
@@ -98,12 +99,15 @@ export default function MCDashboard() {
             </TabsTrigger>
             <TabsTrigger value="cam" className="gap-2">
               <Building className="h-4 w-4" />
-              CAM & Facility
+              CAM
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Chat
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-500">
-            {/* Reuse standard dashboard charts with tower filtration */}
             <Dashboard towerFilter={mcUser.tower_no} isMC={true} />
           </TabsContent>
 
@@ -117,6 +121,10 @@ export default function MCDashboard() {
 
           <TabsContent value="cam" className="space-y-6 animate-in fade-in duration-500">
             <ExportCAM />
+          </TabsContent>
+
+          <TabsContent value="chat" className="space-y-6 animate-in fade-in duration-500">
+            <MCChatHub currentUser={mcUser} />
           </TabsContent>
         </Tabs>
 
