@@ -48,19 +48,20 @@ serve(async (req) => {
     // Create lookup map
     const budgetMap = new Map((budgetMaster || []).map((b: any) => [b.id, b]));
 
-    // Fetch income summary
+    // Fetch income categories first
+    const { data: incomeCategories } = await supabase
+      .from("income_categories")
+      .select("*")
+      .eq("is_active", true);
+
+    const categoryMap = new Map((incomeCategories || []).map((c: any) => [c.id, c]));
+
+    // Fetch income summary with ALL entries for current fiscal year
     const { data: incomeActuals } = await supabase
       .from("income_actuals")
       .select(`id, actual_amount, gst_amount, month, status, fiscal_year, category_id`)
       .eq("fiscal_year", fiscalYear)
-      .limit(100);
-
-    // Fetch income categories
-    const { data: incomeCategories } = await supabase
-      .from("income_categories")
-      .select("*");
-
-    const categoryMap = new Map((incomeCategories || []).map((c: any) => [c.id, c]));
+      .order("month", { ascending: false });
 
     // Fetch CAM tracking summary
     const { data: camTracking } = await supabase
@@ -85,6 +86,21 @@ serve(async (req) => {
       .from("user_roles")
       .select("user_id, role");
 
+    // Group income by category for better context
+    const incomeByCategoryMap = new Map<string, { category: string, subcategory: string | null, total: number, entries: any[] }>();
+    (incomeActuals || []).forEach((i: any) => {
+      const cat = categoryMap.get(i.category_id);
+      const key = cat?.category_name || 'Unknown';
+      if (!incomeByCategoryMap.has(key)) {
+        incomeByCategoryMap.set(key, { category: key, subcategory: null, total: 0, entries: [] });
+      }
+      const group = incomeByCategoryMap.get(key)!;
+      group.total += i.actual_amount || 0;
+      group.entries.push({ month: i.month, amount: i.actual_amount, subcategory: cat?.subcategory_name, status: i.status });
+    });
+
+    const incomeByCategory = Array.from(incomeByCategoryMap.values());
+
     // Build context
     contextData = `
 CURRENT FISCAL YEAR: ${fiscalYear}
@@ -98,11 +114,16 @@ ${expenses?.slice(0, 20).map((e: any) => {
 
 Total Expenses: ₹${expenses?.reduce((sum: number, e: any) => sum + (e.amount || 0), 0).toLocaleString()}
 
-INCOME SUMMARY (${incomeActuals?.length || 0} entries):
-${incomeActuals?.slice(0, 15).map((i: any) => {
-  const cat = categoryMap.get(i.category_id);
-  return `- Month ${i.month}: ${cat?.category_name || 'Unknown'} ${cat?.subcategory_name ? `- ${cat.subcategory_name}` : ''} - ₹${i.actual_amount} (Status: ${i.status})`;
-}).join("\n") || "No income found"}
+INCOME CATEGORIES AVAILABLE:
+${incomeCategories?.map((c: any) => `- ${c.category_name}${c.subcategory_name ? ` > ${c.subcategory_name}` : ''}`).join("\n") || "No categories"}
+
+INCOME SUMMARY BY CATEGORY (${incomeActuals?.length || 0} total entries):
+${incomeByCategory.map((g: any) => {
+  const entrySummary = g.entries.slice(0, 5).map((e: any) => 
+    `  - Month ${e.month}: ₹${e.amount?.toLocaleString()}${e.subcategory ? ` (${e.subcategory})` : ''}`
+  ).join("\n");
+  return `${g.category}: Total ₹${g.total.toLocaleString()}\n${entrySummary}`;
+}).join("\n\n") || "No income found"}
 
 BUDGET ITEMS (${budgetMaster?.length || 0} items):
 ${budgetMaster?.slice(0, 15).map((b: any) => 
