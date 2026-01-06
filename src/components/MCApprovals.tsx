@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Download, Loader2, CheckCircle, XCircle, User, Trash2 } from 'lucide-react';
+import { Download, Loader2, CheckCircle, XCircle, User, Trash2, Mail, Bell } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
   Dialog,
@@ -43,7 +43,48 @@ export default function MCApprovals() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved'>('pending');
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Get users who haven't set their password yet
+  const pendingPasswordUsers = approvedMC.filter(mc => mc.temp_password);
+
+  const handleSendReminder = async (mcUser?: MCUser) => {
+    setSendingReminder(mcUser?.id || 'all');
+    try {
+      const { data, error } = await supabase.functions.invoke('send-mc-reminder', {
+        body: mcUser ? { mc_user_id: mcUser.id } : { send_all: true }
+      });
+
+      if (error) throw error;
+
+      const response = data as { success: boolean; sent: number; total: number; errors?: string[] };
+
+      if (response.sent > 0) {
+        toast({
+          title: 'Reminder Sent',
+          description: `Successfully sent ${response.sent} reminder email${response.sent > 1 ? 's' : ''}.`,
+        });
+      } else {
+        toast({
+          title: 'No Reminders Sent',
+          description: 'All approved users have already set their passwords.',
+        });
+      }
+
+      if (response.errors && response.errors.length > 0) {
+        console.error('Some reminders failed:', response.errors);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send reminder',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingReminder(null);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -323,15 +364,37 @@ export default function MCApprovals() {
           <TabsContent value="approved" className="mt-4">
             <Card>
               <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <div>
                     <CardTitle>Approved Members</CardTitle>
                     <CardDescription>View credentials and manage member access</CardDescription>
+                    {pendingPasswordUsers.length > 0 && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        {pendingPasswordUsers.length} member{pendingPasswordUsers.length > 1 ? 's' : ''} haven't set their password yet
+                      </p>
+                    )}
                   </div>
-                  <Button variant="outline" size="sm" onClick={downloadApprovedUsers}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download List
-                  </Button>
+                  <div className="flex gap-2">
+                    {pendingPasswordUsers.length > 0 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleSendReminder()}
+                        disabled={sendingReminder === 'all'}
+                      >
+                        {sendingReminder === 'all' ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Bell className="h-4 w-4 mr-2" />
+                        )}
+                        Remind All ({pendingPasswordUsers.length})
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={downloadApprovedUsers}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download List
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -363,13 +426,36 @@ export default function MCApprovals() {
                         </div>
 
                         <div className="flex flex-col gap-1 flex-1">
-                          <div className="text-xs text-muted-foreground">Temp Password:</div>
-                          <div className="text-sm font-mono bg-muted px-2 py-1 rounded select-all truncate">
-                            {mc.temp_password || '---'}
+                          <div className="text-xs text-muted-foreground">Status:</div>
+                          <div className="text-sm">
+                            {mc.temp_password ? (
+                              <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                                Pending Password Setup
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+                                Active
+                              </Badge>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2">
+                          {mc.temp_password && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSendReminder(mc)}
+                              disabled={sendingReminder === mc.id}
+                              title="Send reminder email to complete password setup"
+                            >
+                              {sendingReminder === mc.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Mail className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
