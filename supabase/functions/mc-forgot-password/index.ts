@@ -32,17 +32,20 @@ async function sendEmailViaGmail(to: string, subject: string, htmlContent: strin
         tls: true,
         auth: {
           username: gmailUser,
-          password: gmailAppPassword.replace(/\s/g, ''), // Remove spaces from app password
+          password: gmailAppPassword.replace(/\s/g, ''),
         },
       },
     });
+
+    // Remove all whitespace between HTML tags to prevent =20 encoding issues
+    const cleanHtml = htmlContent.replace(/>\s+</g, '><').replace(/\n\s*/g, '');
 
     await client.send({
       from: gmailUser,
       to: to,
       subject: subject,
       content: "Please view this email in an HTML-capable email client.",
-      html: htmlContent,
+      html: cleanHtml,
     });
 
     await client.close();
