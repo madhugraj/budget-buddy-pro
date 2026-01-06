@@ -88,8 +88,9 @@ export function ExportIncome() {
 
         if (error) throw error;
 
+        // Return empty array instead of throwing error for empty results
         if (!incomeData || incomeData.length === 0) {
-            throw new Error('No income records match the selected filters');
+            return [];
         }
 
         // Fetch profiles manually
@@ -132,6 +133,17 @@ export function ExportIncome() {
         setLoading(true);
         try {
             const data = await fetchIncomeData();
+
+            // Handle empty results gracefully
+            if (data.length === 0) {
+                setViewData([]);
+                setShowView(true);
+                toast({
+                    title: 'No records found',
+                    description: 'No income records match the selected filters. Try adjusting your filters.',
+                });
+                return;
+            }
 
             // Transform data for view
             const transformedData = data.map((income: any) => ({
