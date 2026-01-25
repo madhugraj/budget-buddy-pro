@@ -29,15 +29,15 @@ serve(async (req) => {
     const fiscalEndYear = fiscalStartYear + 1;
     const fiscalYear = `FY${String(fiscalStartYear).slice(-2)}-${String(fiscalEndYear).slice(-2)}`;
 
-    // Fetch expenses summary
+    // Fetch ALL expenses for current fiscal year (no limit)
     const { data: expenses } = await supabase
       .from("expenses")
       .select(`
         id, amount, gst_amount, description, expense_date, status, budget_master_id
       `)
       .gte("expense_date", `${fiscalStartYear}-04-01`)
-      .order("expense_date", { ascending: false })
-      .limit(100);
+      .lte("expense_date", `${fiscalEndYear}-03-31`)
+      .order("expense_date", { ascending: false });
 
     // Fetch budget master for expense names
     const { data: budgetMaster } = await supabase
@@ -107,13 +107,33 @@ serve(async (req) => {
 CURRENT FISCAL YEAR: ${fiscalYear}
 CURRENT DATE: ${new Date().toISOString().split("T")[0]}
 
-EXPENSE SUMMARY (Recent ${expenses?.length || 0} entries):
-${expenses?.slice(0, 20).map((e: any) => {
-  const budget = budgetMap.get(e.budget_master_id);
-  return `- ${e.expense_date}: ${budget?.item_name || 'Unknown'} - ₹${e.amount} (Status: ${e.status})`;
-}).join("\n") || "No expenses found"}
+EXPENSE SUMMARY BY ITEM (${expenses?.length || 0} total entries in ${fiscalYear}):
+${(() => {
+  const byItem = new Map<string, { total: number, count: number, entries: any[] }>();
+  (expenses || []).forEach((e: any) => {
+    const budget = budgetMap.get(e.budget_master_id);
+    const itemName = budget?.item_name || 'Unknown';
+    if (!byItem.has(itemName)) {
+      byItem.set(itemName, { total: 0, count: 0, entries: [] });
+    }
+    const item = byItem.get(itemName)!;
+    item.total += e.amount || 0;
+    item.count++;
+    item.entries.push({ date: e.expense_date, amount: e.amount, status: e.status });
+  });
+  return Array.from(byItem.entries()).slice(0, 30).map(([name, data]) => {
+    const monthSummary = new Map<string, number>();
+    data.entries.forEach((e: any) => {
+      const d = new Date(e.date);
+      const monthKey = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
+      monthSummary.set(monthKey, (monthSummary.get(monthKey) || 0) + e.amount);
+    });
+    const months = Array.from(monthSummary.entries()).map(([m, amt]) => `${m}: ₹${amt.toLocaleString()}`).join(", ");
+    return `${name}: Total ₹${data.total.toLocaleString()} (${data.count} entries) - ${months}`;
+  }).join("\n") || "No expenses found";
+})()}
 
-Total Expenses: ₹${expenses?.reduce((sum: number, e: any) => sum + (e.amount || 0), 0).toLocaleString()}
+Total Expenses for ${fiscalYear}: ₹${expenses?.reduce((sum: number, e: any) => sum + (e.amount || 0), 0).toLocaleString()}
 
 INCOME CATEGORIES AVAILABLE:
 ${incomeCategories?.map((c: any) => `- ${c.category_name}${c.subcategory_name ? ` > ${c.subcategory_name}` : ''}`).join("\n") || "No categories"}
