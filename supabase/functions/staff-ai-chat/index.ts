@@ -70,12 +70,13 @@ serve(async (req) => {
       .eq("year", fiscalStartYear)
       .order("month", { ascending: false });
 
-    // Fetch petty cash summary
+    // Fetch petty cash summary for current fiscal year (April to March)
     const { data: pettyCash } = await supabase
       .from("petty_cash")
       .select("*")
-      .order("date", { ascending: false })
-      .limit(50);
+      .gte("date", `${fiscalStartYear}-04-01`)
+      .lte("date", `${fiscalEndYear}-03-31`)
+      .order("date", { ascending: false });
 
     // Fetch user profiles for communication
     const { data: profiles } = await supabase
@@ -135,10 +136,24 @@ ${camTracking?.slice(0, 10).map((c: any) =>
   `- ${c.tower} (${c.month}/${c.year}): Paid ${c.paid_flats}/${c.total_flats} flats (Status: ${c.status})`
 ).join("\n") || "No CAM data"}
 
-PETTY CASH (Recent):
-${pettyCash?.slice(0, 10).map((p: any) => 
-  `- ${p.date}: ${p.item_name} - ₹${p.amount} (Status: ${p.status})`
-).join("\n") || "No petty cash entries"}
+PETTY CASH SUMMARY BY MONTH (${pettyCash?.length || 0} total entries in ${fiscalYear}):
+${(() => {
+  const byMonth = new Map<string, { total: number, count: number, items: any[] }>();
+  (pettyCash || []).forEach((p: any) => {
+    const d = new Date(p.date);
+    const monthKey = `${d.toLocaleString('default', { month: 'long' })} ${d.getFullYear()}`;
+    if (!byMonth.has(monthKey)) {
+      byMonth.set(monthKey, { total: 0, count: 0, items: [] });
+    }
+    const m = byMonth.get(monthKey)!;
+    m.total += p.amount || 0;
+    m.count++;
+    if (m.items.length < 5) m.items.push({ item: p.item_name, amount: p.amount, date: p.date });
+  });
+  return Array.from(byMonth.entries()).map(([month, data]) => 
+    `${month}: ₹${data.total.toLocaleString()} (${data.count} entries)\n${data.items.map((i: any) => `  - ${i.date}: ${i.item} - ₹${i.amount}`).join("\n")}`
+  ).join("\n\n") || "No petty cash entries";
+})()}
 
 TEAM MEMBERS:
 ${profiles?.map((p: any) => {
