@@ -206,6 +206,18 @@ GUIDELINES:
 - If data is not found, clearly state so
 - For communication requests, format as: "[TO: role/name] Message: content"
 - Reference specific data when answering queries
+
+IMPORTANT - TABLE FORMATTING:
+When listing multiple entries (expenses, income, petty cash entries, etc.), ALWAYS format as a markdown table:
+| Date | Item/Description | Amount | Status |
+|------|------------------|--------|--------|
+| 2025-10-15 | LIFT | ₹9,15,934 | Approved |
+
+Use tables whenever showing:
+- List of expense entries
+- List of income entries
+- List of petty cash entries
+- Any list with 3+ items that have multiple columns
 `;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

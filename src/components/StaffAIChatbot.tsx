@@ -6,9 +6,101 @@ import { Bot, Send, X, MessageCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+}
+
+// Component to format AI messages with tables
+function FormattedMessage({ content }: { content: string }) {
+  // Check if content contains table-like data (rows with | separators)
+  const hasTableData = content.includes('|') && content.split('\n').filter(line => line.includes('|')).length >= 2;
+  
+  if (hasTableData) {
+    const lines = content.split('\n');
+    const tableLines: string[] = [];
+    const textBefore: string[] = [];
+    const textAfter: string[] = [];
+    let foundTable = false;
+    let tableEnded = false;
+    
+    lines.forEach(line => {
+      if (line.includes('|') && !tableEnded) {
+        foundTable = true;
+        tableLines.push(line);
+      } else if (!foundTable) {
+        textBefore.push(line);
+      } else {
+        tableEnded = true;
+        textAfter.push(line);
+      }
+    });
+    
+    // Parse table if we have rows
+    if (tableLines.length >= 2) {
+      const rows = tableLines
+        .filter(line => !line.match(/^\s*\|?\s*[-:]+\s*\|/)) // Remove separator lines
+        .map(line => 
+          line.split('|')
+            .map(cell => cell.trim())
+            .filter(cell => cell.length > 0)
+        )
+        .filter(row => row.length > 0);
+      
+      if (rows.length >= 1) {
+        const headers = rows[0];
+        const dataRows = rows.slice(1);
+        
+        return (
+          <div className="space-y-2">
+            {textBefore.length > 0 && (
+              <div className="whitespace-pre-wrap">{textBefore.join('\n')}</div>
+            )}
+            <div className="overflow-x-auto rounded border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {headers.map((header, i) => (
+                      <TableHead key={i} className="text-xs font-semibold">{header}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dataRows.map((row, i) => (
+                    <TableRow key={i}>
+                      {row.map((cell, j) => (
+                        <TableCell key={j} className="text-xs py-1">{cell}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {textAfter.length > 0 && (
+              <div className="whitespace-pre-wrap">{textAfter.join('\n')}</div>
+            )}
+          </div>
+        );
+      }
+    }
+  }
+  
+  // Format bullet points and basic markdown
+  const formatted = content
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\* /gm, '• ')
+    .replace(/^- /gm, '• ');
+  
+  return <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: formatted }} />;
 }
 
 export function StaffAIChatbot() {
@@ -169,7 +261,7 @@ export function StaffAIChatbot() {
                           : 'bg-muted'
                       }`}
                     >
-                      {msg.content}
+                      <FormattedMessage content={msg.content} />
                     </div>
                   </div>
                 ))}
